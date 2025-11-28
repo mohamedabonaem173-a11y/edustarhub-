@@ -1,8 +1,10 @@
 {
+  "version": 2,
   "framework": "nextjs",
-  "build": {
-    "env": {
-      "NODE_ENV": "production"
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
     }
-  }
+  ]
 }
