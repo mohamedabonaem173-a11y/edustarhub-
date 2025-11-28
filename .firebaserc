@@ -1,0 +1,21 @@
+// src/firebasesrc.js
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD2V53PQ1jEWPoQ-trZT4XmMMhqTJTi9w8",
+  authDomain: "edustarhub-25dbf.firebaseapp.com",
+  projectId: "edustarhub-25dbf",
+  storageBucket: "edustarhub-25dbf.appspot.com",
+  messagingSenderId: "929511763188",
+  appId: "1:929511763188:web:a781b9265fed76f1cc82a1",
+  measurementId: "G-F4E4RT4EWQ"
+};
+
+const app = initializeApp(firebaseConfig);
+
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
