@@ -6,5 +6,12 @@
       "src": "package.json",
       "use": "@vercel/next"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "destination": "https://edustarhub-8u36-git-main-mohamedabonaem173-a11ys-projects.vercel.app/$1",
+      "permanent": false
+    }
   ]
 }
