@@ -1,21 +1,67 @@
-// pages/student/dashboard.js - STABILITY RESTORED VERSION
+// pages/student/dashboard.js - PURE SUPABASE CHECK
 
 import { useState, useEffect, useCallback } from 'react';
 import Navbar from '../../components/Navbar'; 
 import Sidebar from '../../components/Sidebar';
 import { supabase } from '../../lib/supabaseClient'; 
 import Link from 'next/link';
+import { useRouter } from 'next/router'; // NEW IMPORT
 
 const RESOURCES_TABLE = 'resources'; 
 
 export default function StudentDashboard() {
     const role = 'student';
+    const router = useRouter(); // Initialize router
     const [userId, setUserId] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true); // Control overall loading
     const [resources, setResources] = useState([]);
     const [error, setError] = useState(null);
+    
+    // State to manage the setup check separately
+    const [setupChecked, setSetupChecked] = useState(false); 
 
-    // --- User Initialization ---
+    // 🛑 MANDATORY BUDDY SETUP REDIRECTION CHECK (SUPABASE) 🛑
+    useEffect(() => {
+        const checkBuddySetup = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            const user = session?.user;
+
+            if (!user) {
+                // If not logged in, let the standard login flow handle redirection
+                setSetupChecked(true); 
+                return;
+            }
+
+            try {
+                // Fetch the 'buddy_name' column from the student's profile
+                const { data: profile, error } = await supabase
+                    .from('profiles')
+                    .select('buddy_name')
+                    .eq('id', user.id)
+                    .single();
+
+                if (error) throw error;
+
+                if (!profile.buddy_name) {
+                    // Buddy name is null or empty, force setup
+                    router.replace('/student/buddy-setup');
+                } else {
+                    // Setup is complete, proceed with dashboard loading
+                    setSetupChecked(true);
+                }
+            } catch (err) {
+                console.error("Error checking buddy setup:", err);
+                // On error, assume they need setup or try again
+                router.replace('/student/buddy-setup');
+            }
+        };
+
+        checkBuddySetup();
+    }, [router]);
+    // ----------------------------------------------
+
+
+    // --- User Initialization (Runs after setup check) ---
     useEffect(() => {
         async function getUserId() {
             const { data: { session } } = await supabase.auth.getSession();
@@ -28,6 +74,8 @@ export default function StudentDashboard() {
 
     // --- Fetch ALL resources for the Student Dashboard ---
     const fetchAllResources = useCallback(async () => {
+        if (!setupChecked) return; // Wait until setup check is done
+
         setLoading(true);
         setError(null);
         
@@ -48,7 +96,7 @@ export default function StudentDashboard() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [setupChecked]); // DEPENDENCY ADDED
 
     useEffect(() => {
         fetchAllResources();
@@ -83,14 +131,30 @@ export default function StudentDashboard() {
         );
 
         return linkHref ? (
-            <Link href={linkHref} passHref legacyBehavior>
-                <a>{content}</a>
+            <Link 
+                href={linkHref} 
+                className="block" // Use modern Link usage
+            >
+                {content}
             </Link>
         ) : (
             content
         );
     };
 
+    // Show a loading screen while we check Supabase OR if resources are loading
+    if (!setupChecked || loading) { 
+        return (
+            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                <div className="text-center">
+                    <p className="text-2xl font-semibold text-indigo-600 mb-2">Initializing Student Portal...</p>
+                    <p className="text-gray-500">Please wait while we check your profile settings.</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Main Dashboard Render
     return (
         <div className="min-h-screen bg-gray-100"> 
             <Navbar userRole="Student" /> 
@@ -109,7 +173,7 @@ export default function StudentDashboard() {
                             title="Game Points"
                             value={gamePoints}
                             detail="Go to the arena to earn more points!"
-                            icon="⚡" // Using Emoji instead of lucide icon
+                            icon="⚡"
                             iconColor="text-yellow-500"
                             linkHref="/student/games"
                         />
@@ -118,7 +182,7 @@ export default function StudentDashboard() {
                             title="Learning Progress"
                             value={`${learningProgress}%`}
                             detail={`Completed ${downloadedCount} of ${totalResources} resources.`}
-                            icon="📈" // Using Emoji instead of lucide icon
+                            icon="📈" 
                             iconColor="text-blue-500"
                         />
 
@@ -126,7 +190,7 @@ export default function StudentDashboard() {
                             title="Achievements"
                             value={hasBadges ? '1 Badge' : 'N/A'}
                             detail={hasBadges ? 'You earned a badge! View details.' : 'No badges earned yet.'}
-                            icon="🏅" // Using Emoji instead of lucide icon
+                            icon="🏅"
                             iconColor="text-purple-500"
                         />
                     </div>
@@ -146,9 +210,7 @@ export default function StudentDashboard() {
                             </div>
                         )}
 
-                        {loading ? (
-                            <p className="text-lg text-gray-600 p-4">Loading resources...</p>
-                        ) : resources.length === 0 ? (
+                        {resources.length === 0 ? (
                             <p className="text-gray-500 p-4 border rounded-lg bg-gray-50">No recent resources found. Ask your teacher to upload some!</p>
                         ) : (
                             <ul className="divide-y divide-gray-200">
@@ -174,10 +236,8 @@ export default function StudentDashboard() {
                                 ))}
                             </ul>
                         )}
-                        <Link href="/student/resources" passHref legacyBehavior>
-                            <a className="mt-6 inline-flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition border-b border-dashed border-indigo-400">
-                                View all resources and subjects →
-                            </a>
+                        <Link href="/student/resources" className="mt-6 inline-flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition border-b border-dashed border-indigo-400">
+                            View all resources and subjects →
                         </Link>
                     </div>
                 </main>
