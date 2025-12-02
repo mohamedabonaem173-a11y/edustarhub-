@@ -1,8 +1,8 @@
-// pages/student/buddy.js (FINAL WITH GEMINI INTEGRATION)
+// pages/student/buddy.js (FINAL, CORRECTED, and PRODUCTION-READY)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Navbar from '../../components/Navbar';
-import Sidebar from '../../components/Sidebar'; // <-- Import Sidebar
+import Sidebar from '../../components/Sidebar'; 
 import { useRouter } from 'next/router';
 import { createClient } from '@supabase/supabase-js'; 
 
@@ -15,13 +15,15 @@ const SUPABASE_ANON_KEY = "sb_publishable_nSzApJy-q9gkhOjgf00VfA_vr_04rBR";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ---
 
-// 🛑 NEW: Gemini Configuration
-// !!! REPLACE "YOUR_GEMINI_API_KEY_HERE" WITH YOUR ACTUAL KEY !!!
-const GEMINI_API_KEY = "AIzaSyDT471LEfhC0yr226wP-tLBLi3WCxRJQSU"; 
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+// 🛑 CRITICAL FIX: Gemini Configuration now reads the key from the public Netlify environment variable
+// We MUST use NEXT_PUBLIC_ for client-side code in Next.js
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY; 
+
+// Initialize AI Client ONLY if the key is available
+const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 const modelName = 'gemini-2.5-flash';
 
-// 🛑 NEW: Define the Buddy's Personality and Role (Crucial for context and slang)
+// 🛑 NEW: Define the Buddy's Personality and Role
 const BUDDY_SYSTEM_INSTRUCTION = (buddyName) => 
 `You are ${buddyName}, a friendly, supportive, and highly knowledgeable Study and Stress Buddy for high school students. 
 Your primary roles are: 
@@ -33,6 +35,7 @@ Your primary roles are:
 
 export default function StudentBuddy() {
     const router = useRouter();
+    const messagesEndRef = useRef(null); // Ref for auto-scrolling
     const [buddyName, setBuddyName] = useState(null); 
     const [buddyAvatar, setBuddyAvatar] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -43,10 +46,22 @@ export default function StudentBuddy() {
     // 🛑 NEW: State for the Gemini Chat Session
     const [chatSession, setChatSession] = useState(null);
 
-    // EFFECT: Fetch customization from Supabase and initialize chat
+    // Scroll to the latest message
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    // EFFECT: Initialize chat and fetch buddy setup
     useEffect(() => {
         const fetchBuddySetup = async () => {
             setLoading(true);
+            
+            // 🛑 SAFETY CHECK: If AI client failed to initialize (missing key), redirect or show error
+            if (!ai) {
+                console.error("CRITICAL: Gemini AI client failed to initialize. Check NEXT_PUBLIC_GEMINI_API_KEY in Netlify.");
+                // We'll proceed to load UI, but the chat will show an error message.
+            }
+
             try {
                 const { data: { user } } = await supabase.auth.getUser();
 
@@ -73,13 +88,15 @@ export default function StudentBuddy() {
                 setBuddyAvatar(avatar);
 
                 // 🛑 NEW: Initialize the Gemini Chat Session with System Instructions
-                const newChat = ai.chats.create({
-                    model: modelName,
-                    config: {
-                        systemInstruction: BUDDY_SYSTEM_INSTRUCTION(name),
-                    },
-                });
-                setChatSession(newChat);
+                if (ai) { // Only initialize chat if AI client is valid
+                    const newChat = ai.chats.create({
+                        model: modelName,
+                        config: {
+                            systemInstruction: BUDDY_SYSTEM_INSTRUCTION(name),
+                        },
+                    });
+                    setChatSession(newChat);
+                }
 
                 // Initialize chat history with the Buddy's first message
                 setMessages([{ 
@@ -100,11 +117,30 @@ export default function StudentBuddy() {
         fetchBuddySetup();
     }, [router]);
     
-    // 🛑 UPDATED: handleSendMessage now uses the Gemini API
+    // EFFECT: Scroll on new messages
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+
+    // 🛑 UPDATED: handleSendMessage now uses the Gemini API and includes the safety check
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        // Check for input, typing status, and if the chat session is ready
-        if (!input.trim() || isTyping || !buddyName || !chatSession) return; 
+        
+        // 🛑 CRITICAL SAFETY CHECK: Check if AI client initialized successfully
+        if (!input.trim() || isTyping || !buddyName || !chatSession || !ai) { 
+             console.error("AI client not initialized or missing key.");
+             
+             // If the AI object is missing, send the user the error immediately
+             if (!ai) {
+                 setMessages(prev => [...prev, {
+                     text: "Oops! I ran into a technical glitch. The AI service is currently unavailable. Please contact support.",
+                     sender: 'buddy',
+                     avatar: buddyAvatar
+                 }]);
+             }
+             return;
+        } 
 
         const userMessage = { text: input, sender: 'user', avatar: '🧑‍🎓' };
         
@@ -130,9 +166,9 @@ export default function StudentBuddy() {
 
         } catch (error) {
             console.error("Gemini API Error:", error);
-            // Inform the user about the error
+            // Inform the user about the error with the custom message
             const errorResponse = {
-                text: "Oops! I ran into a technical glitch. Please make sure you have installed the @google/genai package and your API key is correct. Could you try asking that again?",
+                text: "Oops! I ran into a technical glitch. The AI service couldn't respond. Could you try asking that again?",
                 sender: 'buddy',
                 avatar: buddyAvatar
             };
@@ -143,17 +179,19 @@ export default function StudentBuddy() {
     };
 
 
-    if (loading || !buddyName || !chatSession) {
+    if (loading || !buddyName) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <p className="text-xl text-violet-600">Connecting to your personalized companion...</p>
+            // Apply dark mode styling to loading screen
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                <p className="text-xl text-violet-600 dark:text-violet-400">Connecting to your personalized companion...</p>
             </div>
         );
     }
 
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        // Apply dark mode styling to main layout
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             <Navbar userRole="Student" />
             
             <div className="max-w-7xl mx-auto flex pt-4">
@@ -161,13 +199,13 @@ export default function StudentBuddy() {
                 
                 <main className="flex-1 p-8">
                     <div className="flex justify-between items-center mb-8 border-b pb-2">
-                        <h1 className="text-4xl font-extrabold text-gray-900">
+                        <h1 className="text-4xl font-extrabold text-gray-900 dark:text-gray-100">
                             {buddyAvatar} {buddyName} - Study & Stress Buddy
                         </h1>
                     </div>
 
                     {/* Chat Window */}
-                    <div className="bg-white shadow-xl rounded-xl flex flex-col h-[80vh]">
+                    <div className="bg-white dark:bg-gray-800 shadow-xl rounded-xl flex flex-col h-[80vh]">
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">
                             {messages.map((msg, index) => (
                                 <div 
@@ -175,6 +213,7 @@ export default function StudentBuddy() {
                                     className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     <div className={`flex items-end max-w-xs md:max-w-md ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                                        
                                         {/* Avatar (Buddy's custom avatar or student emoji) */}
                                         <div className={`text-2xl p-2 ${msg.sender === 'user' ? 'ml-2' : 'mr-2'}`}>
                                             {msg.avatar}
@@ -185,7 +224,8 @@ export default function StudentBuddy() {
                                             className={`p-4 rounded-3xl text-sm leading-relaxed whitespace-pre-wrap shadow ${
                                                 msg.sender === 'user' 
                                                     ? 'bg-indigo-600 text-white rounded-br-none' 
-                                                    : 'bg-gray-200 text-gray-800 rounded-tl-none'
+                                                    // Dark mode bubble styling
+                                                    : 'bg-gray-200 text-gray-800 rounded-tl-none dark:bg-gray-700 dark:text-gray-200'
                                             }`}
                                         >
                                             {msg.text}
@@ -197,8 +237,9 @@ export default function StudentBuddy() {
                                 <div className="flex justify-start">
                                     <div className="flex items-end max-w-md">
                                         <div className="text-2xl p-2 mr-2">{buddyAvatar}</div>
-                                        <div className="p-4 rounded-3xl text-sm bg-gray-200 text-gray-800 rounded-tl-none">
+                                        <div className="p-4 rounded-3xl text-sm bg-gray-200 text-gray-800 rounded-tl-none dark:bg-gray-700 dark:text-gray-200">
                                             <div className="flex space-x-1">
+                                                {/* Typing indicator dots */}
                                                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce-dot" style={{ animationDelay: '0s' }}></div>
                                                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce-dot" style={{ animationDelay: '0.2s' }}></div>
                                                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce-dot" style={{ animationDelay: '0.4s' }}></div>
@@ -207,16 +248,18 @@ export default function StudentBuddy() {
                                     </div>
                                 </div>
                             )}
+                            <div ref={messagesEndRef} /> {/* Auto-scroll target */}
                         </div>
 
                         {/* Input Area */}
-                        <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 flex">
+                        <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 dark:border-gray-700 flex">
                             <input
                                 type="text"
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 placeholder="Ask your Buddy about stress or your school work..."
-                                className="flex-1 p-3 border border-gray-300 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                // Dark mode input styling
+                                className="flex-1 p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
                                 disabled={isTyping}
                             />
                             <button
