@@ -1,3 +1,4 @@
+
 // pages/student/buddy-setup.js (SUPABASE MIGRATION)
 
 import React, { useState } from 'react';

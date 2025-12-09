@@ -1,242 +1,193 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Navbar from '../../components/Navbar';
-import Sidebar from '../../components/Sidebar'; 
+import Sidebar from '../../components/Sidebar';
 import { useRouter } from 'next/router';
-import { createClient } from '@supabase/supabase-js'; 
+import { createClient } from '@supabase/supabase-js';
 
-// 🛑 IMPORTANT: The Gemini SDK import is removed because the AI logic moved to the API route.
-
-// --- Supabase Configuration (HARDCODED) ---
 const SUPABASE_URL = "https://zuafcjaseshxjcptfhkg.supabase.co"; 
 const SUPABASE_ANON_KEY = "sb_publishable_nSzApJy-q9gkhOjgf00VfA_vr_04rBR"; 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-// ---
-
-// 🛑 All API Key usage has been removed from this client-side file.
-
 
 export default function StudentBuddy() {
-    const router = useRouter();
-    const messagesEndRef = useRef(null); 
-    const [buddyName, setBuddyName] = useState(null); 
-    const [buddyAvatar, setBuddyAvatar] = useState(null);
-    const [messages, setMessages] = useState([]);
-    const [input, setInput] = useState('');
-    const [isTyping, setIsTyping] = useState(false);
-    const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const messagesEndRef = useRef(null);
+  const [buddyName, setBuddyName] = useState(null);
+  const [buddyAvatar, setBuddyAvatar] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-    // Scroll to the latest message
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    const fetchBuddySetup = async () => {
+      setLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return router.replace('/student/buddy-setup');
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('buddy_name, buddy_avatar')
+          .eq('id', user.id)
+          .single();
+
+        if (error || !data.buddy_name) return router.replace('/student/buddy-setup');
+
+        setBuddyName(data.buddy_name);
+        setBuddyAvatar(data.buddy_avatar);
+
+        setMessages([{
+          text: `Hello! I'm ${data.buddy_name}. I'm here to help you study. What's on your mind?`,
+          sender: 'buddy',
+          avatar: data.buddy_avatar
+        }]);
+      } catch (err) {
+        console.error(err);
+        router.replace('/student/buddy-setup');
+      } finally {
+        setLoading(false);
+      }
     };
 
-    // EFFECT: Initialize chat and fetch buddy setup
-    useEffect(() => {
-        const fetchBuddySetup = async () => {
-            setLoading(true);
-            
-            try {
-                const { data: { user } } = await supabase.auth.getUser();
+    fetchBuddySetup();
+  }, [router]);
 
-                if (!user) {
-                    router.replace('/student/buddy-setup');
-                    return;
-                }
+  useEffect(() => scrollToBottom(), [messages]);
 
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('buddy_name, buddy_avatar')
-                    .eq('id', user.id)
-                    .single();
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || isTyping || !buddyName) return;
 
-                if (error || !data.buddy_name) {
-                    router.replace('/student/buddy-setup');
-                    return;
-                }
-                
-                const name = data.buddy_name;
-                const avatar = data.buddy_avatar;
-                
-                setBuddyName(name);
-                setBuddyAvatar(avatar);
+    const userMessage = { text: input, sender: 'user', avatar: '🧑‍🎓' };
+    const currentMessages = [...messages]; 
+    setMessages(prev => [...prev, userMessage]);
 
-                // 🛑 Chat Session Initialization is REMOVED. The serverless function handles the AI logic.
+    const currentInput = input;
+    setInput('');
+    setIsTyping(true);
 
-                // Initialize chat history with the Buddy's first message
-                setMessages([{ 
-                    text: `Hello! I'm ${name}. I'm here to help you study and manage any stress you might be feeling. What's on your mind?`, 
-                    sender: 'buddy', 
-                    avatar: avatar
-                }]);
-                
-            } catch (err) {
-                console.error("Error fetching buddy setup:", err);
-                // Fallback to setup if any error occurs
-                router.replace('/student/buddy-setup');
-            } finally {
-                setLoading(false);
-            }
-        };
+    const conversationHistory = currentMessages.slice(1);
+    const historyForAPI = conversationHistory.map(msg => ({
+      role: msg.sender === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.text }],
+    }));
+    historyForAPI.push({
+      role: 'user',
+      parts: [{ text: currentInput }],
+    });
 
-        fetchBuddySetup();
-    }, [router]);
-    
-    // EFFECT: Scroll on new messages
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+    try {
+      const response = await fetch('/api/gemini-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ history: historyForAPI, buddyName })
+      });
 
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Gemini API Error');
+      }
 
-    // ✅ UPDATED: handleSendMessage now calls the secure Next.js API Route
-    const handleSendMessage = async (e) => {
-        e.preventDefault();
-        
-        // Basic checks for input and state
-        if (!input.trim() || isTyping || !buddyName) { 
-           return;
-        } 
+      const data = await response.json();
+      setMessages(prev => [...prev, { text: data.text, sender: 'buddy', avatar: buddyAvatar }]);
 
-        const userMessage = { text: input, sender: 'user', avatar: '🧑‍🎓' };
-        
-        // Optimistically update the UI with the user's message
-        setMessages(prev => [...prev, userMessage]);
-        const currentInput = input;
-        setInput('');
-        setIsTyping(true);
-
-        try {
-            // 🚀 CALL YOUR SECURE NEXT.JS API ROUTE 🚀
-            const response = await fetch('/api/gemini-chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                // Send the message and the buddy's name for system instruction setup on the server
-                body: JSON.stringify({ message: currentInput, buddyName: buddyName }),
-            });
-            
-            if (!response.ok) {
-                // Read the error message from the serverless function
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Server error: ${response.status}`);
-            }
-
-            const data = await response.json();
-            const buddyResponseText = data.text.trim();
-            
-            const buddyResponse = { 
-                text: buddyResponseText, 
-                sender: 'buddy', 
-                avatar: buddyAvatar 
-            };
-            
-            setMessages(prev => [...prev, buddyResponse]);
-
-        } catch (error) {
-            console.error("API Call Error:", error);
-            // Inform the user about the error with the custom message
-            const errorResponse = {
-                text: "Oops! I ran into a technical glitch. The AI service couldn't respond. Please check the console for details, or try asking that again.",
-                sender: 'buddy',
-                avatar: buddyAvatar
-            };
-            setMessages(prev => [...prev, errorResponse]);
-        } finally {
-            setIsTyping(false);
-        }
-    };
-
-
-    if (loading || !buddyName) {
-        return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-                <p className="text-xl text-violet-600 dark:text-violet-400">Connecting to your personalized companion...</p>
-            </div>
-        );
+    } catch (err) {
+      console.error('AI Error:', err);
+      setMessages(prev => [...prev, { text: "Oops! I ran into a technical glitch. Please try again.", sender: 'buddy', avatar: buddyAvatar }]);
+    } finally {
+      setIsTyping(false);
     }
+  };
 
-
+  if (loading || !buddyName) {
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            <Navbar userRole="Student" />
-            
-            <div className="max-w-7xl mx-auto flex pt-4">
-                <Sidebar role="student" /> 
-                
-                <main className="flex-1 p-8">
-                    <div className="flex justify-between items-center mb-8 border-b pb-2">
-                        <h1 className="text-4xl font-extrabold text-gray-900 dark:text-gray-100">
-                            {buddyAvatar} {buddyName} - Study & Stress Buddy
-                        </h1>
-                    </div>
-
-                    {/* Chat Window */}
-                    <div className="bg-white dark:bg-gray-800 shadow-xl rounded-xl flex flex-col h-[80vh]">
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                            {messages.map((msg, index) => (
-                                <div 
-                                    key={index} 
-                                    className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                                >
-                                    <div className={`flex items-end max-w-xs md:max-w-md ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                                        
-                                        {/* Avatar (Buddy's custom avatar or student emoji) */}
-                                        <div className={`text-2xl p-2 ${msg.sender === 'user' ? 'ml-2' : 'mr-2'}`}>
-                                            {msg.avatar}
-                                        </div>
-
-                                        {/* Bubble */}
-                                        <div 
-                                            className={`p-4 rounded-3xl text-sm leading-relaxed whitespace-pre-wrap shadow ${
-                                                msg.sender === 'user' 
-                                                    ? 'bg-indigo-600 text-white rounded-br-none' 
-                                                    // Dark mode bubble styling
-                                                    : 'bg-gray-200 text-gray-800 rounded-tl-none dark:bg-gray-700 dark:text-gray-200'
-                                            }`}
-                                        >
-                                            {msg.text}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                            {isTyping && (
-                                <div className="flex justify-start">
-                                    <div className="flex items-end max-w-md">
-                                        <div className="text-2xl p-2 mr-2">{buddyAvatar}</div>
-                                        <div className="p-4 rounded-3xl text-sm bg-gray-200 text-gray-800 rounded-tl-none dark:bg-gray-700 dark:text-gray-200">
-                                            <div className="flex space-x-1">
-                                                {/* Typing indicator dots */}
-                                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce-dot" style={{ animationDelay: '0s' }}></div>
-                                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce-dot" style={{ animationDelay: '0.2s' }}></div>
-                                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce-dot" style={{ animationDelay: '0.4s' }}></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                            <div ref={messagesEndRef} /> {/* Auto-scroll target */}
-                        </div>
-
-                        {/* Input Area */}
-                        <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 dark:border-gray-700 flex">
-                            <input
-                                type="text"
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                placeholder="Ask your Buddy about stress or your school work..."
-                                className="flex-1 p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
-                                disabled={isTyping}
-                            />
-                            <button
-                                type="submit"
-                                disabled={isTyping || !input.trim()}
-                                className="px-6 py-3 bg-violet-600 text-white font-semibold rounded-r-xl hover:bg-violet-700 transition disabled:bg-gray-400"
-                            >
-                                Send
-                            </button>
-                        </form>
-                    </div>
-
-                </main>
-            </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-gray-900 to-gray-800">
+        <p className="text-cyan-400 text-xl animate-pulse">Connecting to your personalized companion...</p>
+      </div>
     );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800 text-white">
+      <Navbar userRole="Student" />
+      <div className="max-w-7xl mx-auto flex pt-4 gap-6">
+        <Sidebar role="student" />
+        <main className="flex-1 flex flex-col">
+          <div className="flex justify-between items-center mb-6 border-b border-gray-700 pb-3">
+            <h1 className="text-4xl font-extrabold text-cyan-400 flex items-center gap-3">
+              <span className="text-3xl">{buddyAvatar}</span> {buddyName} - Study Buddy
+            </h1>
+          </div>
+
+          <div className="flex-1 bg-black/20 shadow-[0_0_20px_cyan] rounded-2xl flex flex-col overflow-hidden">
+            {/* Chat messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin scrollbar-thumb-cyan-500 scrollbar-track-gray-800">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`flex items-end max-w-md ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <div className="text-3xl p-2">{msg.avatar}</div>
+                    <div className={`p-4 rounded-3xl text-sm shadow-md ${msg.sender === 'user' ? 'bg-cyan-500 text-black hover:shadow-[0_0_15px_cyan] transition' : 'bg-gray-900 text-cyan-400 shadow-inner'}`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {isTyping && (
+                <div className="flex justify-start">
+                  <div className="flex items-end max-w-md animate-pulse">
+                    <div className="text-3xl p-2">{buddyAvatar}</div>
+                    <div className="p-4 rounded-3xl text-sm bg-gray-900 text-cyan-400 shadow-inner">
+                      Typing...
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input box */}
+            <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-700 flex gap-2 bg-black/30">
+              <input
+                type="text"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder="Ask your Buddy..."
+                className="flex-1 p-3 border border-gray-700 rounded-xl bg-gray-900 text-white placeholder-gray-400 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
+                disabled={isTyping}
+              />
+              <button
+                type="submit"
+                disabled={isTyping || !input.trim()}
+                className="px-6 py-3 bg-cyan-500 text-black rounded-xl hover:bg-cyan-400 shadow-lg transition"
+              >
+                Send
+              </button>
+            </form>
+          </div>
+        </main>
+      </div>
+
+      {/* Neon particle background for techy feel */}
+      <div className="absolute inset-0 pointer-events-none">
+        {[...Array(40)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full opacity-30 animate-pulse"
+            style={{
+              width: `${Math.random()*4 + 1}px`,
+              height: `${Math.random()*4 + 1}px`,
+              backgroundColor: `rgba(0,255,255,${Math.random()*0.4})`,
+              top: `${Math.random()*100}%`,
+              left: `${Math.random()*100}%`,
+              animationDelay: `${Math.random()*5}s`
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }

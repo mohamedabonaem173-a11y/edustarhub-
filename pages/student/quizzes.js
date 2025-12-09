@@ -1,5 +1,4 @@
-// pages/student/quizzes.js
-
+// pages/student/quizzes.js (Techy Version)
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import Navbar from '../../components/Navbar';
@@ -7,13 +6,10 @@ import Sidebar from '../../components/Sidebar';
 import Link from 'next/link';
 
 // --- Supabase Configuration (HARDCODED) ---
-// 🛑 WARNING: Replace these placeholders with your actual keys.
 const SUPABASE_URL = "https://zuafcjaseshxjcptfhkg.supabase.co"; 
 const SUPABASE_ANON_KEY = "sb_publishable_nSzApJy-q9gkhOjgf00VfA_vr_04rBR"; 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-// ---
 
-// The student will see all quizzes created by the mock teacher for now
 const MOCK_TEACHER_ID = '00000000-0000-0000-0000-000000000000'; 
 
 export default function StudentQuizListing() {
@@ -25,7 +21,6 @@ export default function StudentQuizListing() {
         setLoading(true);
         setError(null);
         try {
-            // Fetch all quizzes created by the mock teacher
             const { data, error } = await supabase
                 .from('quizzes')
                 .select('id, title, quiz_data, created_at')
@@ -43,60 +38,52 @@ export default function StudentQuizListing() {
         }
     };
 
-    useEffect(() => {
-        fetchQuizzes();
-    }, []);
+    useEffect(() => { fetchQuizzes(); }, []);
     
-    // --- Loading and Error States ---
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <p className="text-xl text-violet-600">Loading available quizzes...</p>
+            <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800 flex items-center justify-center">
+                <p className="text-xl text-cyan-400 animate-pulse">Loading available quizzes...</p>
             </div>
         );
     }
 
-    // --- Main Component Rendering ---
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800 text-white">
             <Navbar userRole="Student" />
             <div className="max-w-7xl mx-auto flex pt-4">
                 <Sidebar role="student" />
                 <main className="flex-1 p-8">
-                    <div className="flex justify-between items-center mb-8 border-b pb-2">
-                        <h1 className="text-4xl font-extrabold text-gray-900">🧠 Available Quizzes</h1>
+
+                    <div className="flex justify-between items-center mb-8 border-b border-gray-700 pb-2 flex-wrap gap-2">
+                        <h1 className="text-4xl font-extrabold text-cyan-400 flex items-center">🧠 Available Quizzes</h1>
                     </div>
 
-                    {error && <p className="text-red-500 mb-4 bg-red-100 p-3 rounded-lg border border-red-300">Error: {error}</p>}
+                    {error && <p className="text-red-500 mb-4 bg-red-900 text-red-300 p-3 rounded-lg border border-red-700">{error}</p>}
 
                     {quizzes.length === 0 ? (
-                        <div className="text-center p-10 bg-white rounded-xl shadow-lg">
-                            <p className="text-xl text-gray-600">No quizzes are currently available.</p>
-                            <p className="text-md text-gray-400 mt-2">Check back later or contact your teacher.</p>
+                        <div className="text-center p-10 bg-black/20 rounded-xl shadow-[0_0_20px_cyan] border border-cyan-500">
+                            <p className="text-xl text-gray-400">No quizzes are currently available.</p>
+                            <p className="text-md text-gray-500 mt-2">Check back later or contact your teacher.</p>
                         </div>
                     ) : (
-                        <div className="bg-white shadow-lg rounded-xl overflow-hidden">
-                            <table className="min-w-full leading-normal">
+                        <div className="bg-black/30 shadow-[0_0_20px_cyan] rounded-xl overflow-hidden border border-cyan-500">
+                            <table className="min-w-full leading-normal border-collapse">
                                 <thead>
-                                    <tr className="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+                                    <tr className="bg-gray-900 text-cyan-400 uppercase text-sm leading-normal">
                                         <th className="py-3 px-6 text-left">Quiz Title</th>
                                         <th className="py-3 px-6 text-left">Questions</th>
                                         <th className="py-3 px-6 text-center">Action</th>
                                     </tr>
                                 </thead>
-                                <tbody className="text-gray-600 text-sm font-light">
+                                <tbody className="text-gray-300 text-sm font-light">
                                     {quizzes.map((quiz) => (
-                                        <tr key={quiz.id} className="border-b border-gray-200 hover:bg-gray-50">
-                                            <td className="py-3 px-6 text-left whitespace-nowrap font-medium text-gray-800">
-                                                {quiz.title}
-                                            </td>
-                                            <td className="py-3 px-6 text-left">
-                                                {quiz.quiz_data.length}
-                                            </td>
+                                        <tr key={quiz.id} className="border-b border-gray-700 hover:bg-gray-800 hover:shadow-[0_0_15px_cyan] transition-all duration-200">
+                                            <td className="py-3 px-6 text-left whitespace-nowrap font-medium text-white">{quiz.title}</td>
+                                            <td className="py-3 px-6 text-left">{quiz.quiz_data.length}</td>
                                             <td className="py-3 px-6 text-center">
-                                                {/* 🛑 THIS IS THE CRITICAL WORKING LINK 🛑 */}
                                                 <Link href={`/student/take-quiz?id=${quiz.id}`} passHref legacyBehavior>
-                                                    <a className="bg-green-500 text-white py-1 px-4 rounded-full text-xs font-bold hover:bg-green-600 transition-colors shadow-sm">
+                                                    <a className="bg-cyan-500 text-black py-1 px-4 rounded-full text-xs font-bold hover:bg-cyan-400 transition-colors shadow-md">
                                                         Start Quiz
                                                     </a>
                                                 </Link>
@@ -108,6 +95,24 @@ export default function StudentQuizListing() {
                         </div>
                     )}
                 </main>
+            </div>
+
+            {/* Subtle neon particle background */}
+            <div className="absolute inset-0 pointer-events-none">
+                {[...Array(50)].map((_, i) => (
+                    <div
+                        key={i}
+                        className="absolute rounded-full opacity-30 animate-pulse"
+                        style={{
+                            width: `${Math.random()*4 + 1}px`,
+                            height: `${Math.random()*4 + 1}px`,
+                            backgroundColor: `rgba(0,255,255,${Math.random()*0.4})`,
+                            top: `${Math.random()*100}%`,
+                            left: `${Math.random()*100}%`,
+                            animationDelay: `${Math.random()*5}s`
+                        }}
+                    />
+                ))}
             </div>
         </div>
     );

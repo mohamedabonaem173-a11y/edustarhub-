@@ -1,5 +1,4 @@
-// pages/signin.js - CORRECTED VERSION
-
+// pages/signin.js - TECHY VERSION
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import Link from 'next/link';
@@ -8,7 +7,7 @@ import { useRouter } from 'next/router';
 export default function AuthPage() {
     const router = useRouter();
     const [isSignUp, setIsSignUp] = useState(false);
-    const [signInRole, setSignInRole] = useState('student'); // 'student' or 'teacher'
+    const [signInRole, setSignInRole] = useState('student');
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -16,7 +15,6 @@ export default function AuthPage() {
     const [signUpRole, setSignUpRole] = useState('student');
     const [message, setMessage] = useState('');
 
-    // --- AUTH LOGIC (CORRECTED) ---
     async function handleAuth(e) {
         e.preventDefault();
         setLoading(true);
@@ -24,147 +22,82 @@ export default function AuthPage() {
 
         try {
             if (isSignUp) {
-                // ------------------ SIGN UP LOGIC ------------------
                 const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
-                    options: {
-                        data: {
-                            full_name: fullName,
-                            role: signUpRole,
-                        }
-                    }
+                    options: { data: { full_name: fullName, role: signUpRole } }
                 });
-
                 if (error) throw error;
-                
-                // CRITICAL: Insert profile data for role-based access
+
                 if (data?.user) {
                     const { error: profileError } = await supabase
                         .from('profiles')
-                        .insert({
-                            id: data.user.id,
-                            email: data.user.email,
-                            role: signUpRole,
-                            full_name: fullName
-                        });
-                    
+                        .insert({ id: data.user.id, email: data.user.email, role: signUpRole, full_name: fullName });
                     if (profileError) throw profileError;
                 }
                 
-                setMessage('Success! Check your email for the confirmation link.');
-                
+                setMessage('✅ Success! Check your email for the confirmation link.');
             } else {
-                // ------------------ SIGN IN LOGIC (FIXED) ------------------
-                const { error } = await supabase.auth.signInWithPassword({
-                    email, 
-                    password
-                });
-                
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
-                
-                // 1. Set the success message
-                setMessage('Signed in successfully! Redirecting...');
-                
-                // 2. Determine the dashboard path using the selected role
-                const dashboardPath = `/${signInRole}/dashboard`; 
-                
-                // 3. EXECUTE THE REDIRECTION using the Next.js router
-                // This will perform the page transition to the dashboard.
-                await router.push(dashboardPath); 
-                
-                // Important: Since we are navigating, we exit the function here.
-                return; 
+
+                setMessage('🚀 Signed in successfully! Redirecting...');
+                await router.push(`/${signInRole}/dashboard`);
+                return;
             }
-            
         } catch (error) {
             console.error("Auth Error:", error.message);
-            setMessage("Auth Error: " + (error.message || "An unknown error occurred."));
+            setMessage("❌ Auth Error: " + (error.message || "An unknown error occurred."));
         } finally {
-            // Only stop loading if we are still on this page (i.e., an error occurred during Sign In/Sign Up)
-            if (message === '' || message.startsWith('Auth Error:')) {
-                setLoading(false);
-            }
+            if (message === '' || message.startsWith('❌ Auth Error')) setLoading(false);
         }
     }
 
-    // --- RETURN STATEMENT (UI REMAINS THE SAME) ---
     return (
-        <div className="min-h-screen bg-[#F5F0FF] flex items-center justify-center p-4">
-            
-            {/* Centered Auth Card */}
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-3xl p-8 border-t-4 border-violet-500">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900">
+            {/* Glowing Card */}
+            <div className="w-full max-w-md bg-gray-800/90 backdrop-blur-lg border border-cyan-500/50 rounded-3xl shadow-[0_0_60px_cyan] p-8 relative overflow-hidden">
                 
-                {/* Toggle between Sign In and Sign Up */}
-                <div className="flex mb-8 border-b border-gray-200">
-                    <button 
-                        onClick={() => setIsSignUp(false)} 
-                        className={`flex-1 py-3 text-lg font-semibold transition ${
-                            !isSignUp ? 'text-violet-600 border-b-2 border-violet-600' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
+                {/* Techy Neon Border Animation */}
+                <div className="absolute inset-0 border-2 border-cyan-400 rounded-3xl animate-pulse mix-blend-overlay pointer-events-none"></div>
+                
+                {/* Toggle */}
+                <div className="flex mb-8 border-b border-gray-600">
+                    <button onClick={() => setIsSignUp(false)} 
+                        className={`flex-1 py-3 text-xl font-bold transition ${!isSignUp ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-white'}`}>
                         Sign In
                     </button>
-                    <button 
-                        onClick={() => setIsSignUp(true)} 
-                        className={`flex-1 py-3 text-lg font-semibold transition ${
-                            isSignUp ? 'text-violet-600 border-b-2 border-violet-600' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
+                    <button onClick={() => setIsSignUp(true)} 
+                        className={`flex-1 py-3 text-xl font-bold transition ${isSignUp ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-white'}`}>
                         Sign Up
                     </button>
                 </div>
 
-                <h1 className="text-3xl font-extrabold text-center text-indigo-800 mb-6">
+                <h1 className="text-3xl md:text-4xl font-extrabold text-center text-cyan-300 mb-6 drop-shadow-lg">
                     {isSignUp ? 'Create Account' : 'Sign In to EDUSTARHUB'}
                 </h1>
-                
-                <form onSubmit={handleAuth} className="space-y-5">
-                    
-                    {/* --- ROLE TOGGLE (Only for Sign In) --- */}
+
+                <form onSubmit={handleAuth} className="space-y-6">
                     {!isSignUp && (
-                        <div className="flex bg-gray-100 rounded-xl p-1 mb-4">
-                            <button 
-                                type="button"
-                                onClick={() => setSignInRole('student')}
-                                className={`flex-1 py-3 rounded-xl font-semibold transition ${
-                                    signInRole === 'student' ? 'bg-violet-600 text-white shadow-md' : 'text-gray-600 hover:bg-white'
-                                }`}
-                            >
+                        <div className="flex bg-gray-900 rounded-xl p-1 gap-2">
+                            <button type="button" onClick={() => setSignInRole('student')}
+                                className={`flex-1 py-3 rounded-xl font-bold transition ${signInRole==='student' ? 'bg-cyan-600 text-black shadow-[0_0_20px_cyan]' : 'text-gray-400 hover:bg-gray-700'}`}>
                                 Student
                             </button>
-                            <button 
-                                type="button"
-                                onClick={() => setSignInRole('teacher')}
-                                className={`flex-1 py-3 rounded-xl font-semibold transition ${
-                                    signInRole === 'teacher' ? 'bg-violet-600 text-white shadow-md' : 'text-gray-600 hover:bg-white'
-                                }`}
-                            >
+                            <button type="button" onClick={() => setSignInRole('teacher')}
+                                className={`flex-1 py-3 rounded-xl font-bold transition ${signInRole==='teacher' ? 'bg-cyan-600 text-black shadow-[0_0_20px_cyan]' : 'text-gray-400 hover:bg-gray-700'}`}>
                                 Teacher
                             </button>
                         </div>
                     )}
-                    
-                    {/* --- SIGN UP FIELDS --- */}
+
                     {isSignUp && (
                         <>
-                            <FormInput
-                                label="Full Name"
-                                value={fullName}
-                                onChange={(e) => setFullName(e.target.value)}
-                                type="text"
-                                required
-                            />
-                            
-                            {/* Role Dropdown for Sign Up (Student/Teacher) */}
+                            <FormInput label="Full Name" value={fullName} onChange={(e)=>setFullName(e.target.value)} type="text" required />
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Account Type</label>
-                                <select
-                                    value={signUpRole}
-                                    onChange={(e) => setSignUpRole(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition"
-                                    required
-                                >
+                                <label className="block text-sm font-semibold text-gray-200 mb-1">Account Type</label>
+                                <select value={signUpRole} onChange={(e)=>setSignUpRole(e.target.value)}
+                                    className="w-full border border-gray-700 bg-gray-900 text-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 transition">
                                     <option value="student">Student</option>
                                     <option value="teacher">Teacher</option>
                                 </select>
@@ -172,57 +105,27 @@ export default function AuthPage() {
                         </>
                     )}
 
-                    {/* Email */}
-                    <FormInput
-                        label="Email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        type="email"
-                        required
-                    />
+                    <FormInput label="Email" value={email} onChange={(e)=>setEmail(e.target.value)} type="email" required />
+                    <FormInput label="Password" value={password} onChange={(e)=>setPassword(e.target.value)} type="password" required />
 
-                    {/* Password */}
-                    <FormInput
-                        label="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        type="password"
-                        required
-                    />
-
-                    {/* Auth Button */}
-                    <button 
-                        type="submit" 
-                        className="w-full py-3 rounded-xl bg-violet-600 text-white font-bold text-lg shadow-lg hover:bg-violet-700 transition transform hover:-translate-y-0.5 disabled:bg-violet-300" 
-                        disabled={loading}
-                    >
-                        {loading ? (isSignUp ? 'Creating...' : 'Signing In...') : (isSignUp ? 'Sign Up' : `Sign In as ${isSignUp ? signUpRole : signInRole}`)}
+                    <button type="submit" disabled={loading}
+                        className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-400 to-indigo-500 text-black font-bold text-lg shadow-[0_0_30px_cyan] hover:shadow-[0_0_50px_cyan] transition-all transform hover:-translate-y-1 disabled:opacity-50">
+                        {loading ? (isSignUp ? 'Creating...' : 'Signing In...') : (isSignUp ? 'Sign Up' : `Sign In as ${signInRole}`)}
                     </button>
-                    
-                    {/* Message Area */}
-                    {message && (
-                        <div className={`text-sm pt-2 text-center font-medium ${message.startsWith('Auth Error') ? 'text-red-500' : 'text-green-600'}`}>
-                            {message}
-                        </div>
-                    )}
+
+                    {message && <div className={`text-center mt-2 font-semibold ${message.startsWith('❌') ? 'text-red-500' : 'text-green-400'} animate-pulse`}>
+                        {message}
+                    </div>}
                 </form>
-                
-                {/* Sign Up / Back to Home Link */}
-                <div className="mt-6 text-center text-gray-500 text-sm">
+
+                <div className="mt-6 text-center text-gray-400 text-sm">
                     {!isSignUp ? (
                         <span>
                             Don't have an account?{' '}
-                            <button 
-                                onClick={() => setIsSignUp(true)} 
-                                className="text-violet-600 font-semibold hover:text-violet-800 transition"
-                            >
-                                Sign up now
-                            </button>
+                            <button onClick={()=>setIsSignUp(true)} className="text-cyan-400 font-bold hover:text-cyan-200 transition">Sign up now</button>
                         </span>
                     ) : (
-                        <Link href="/" className="hover:text-violet-600 transition">
-                            ← Back to Home
-                        </Link>
+                        <Link href="/" className="hover:text-cyan-400 transition">← Back to Home</Link>
                     )}
                 </div>
 
@@ -231,19 +134,11 @@ export default function AuthPage() {
     );
 }
 
-// Simple helper component for better input styling
 const FormInput = ({ label, value, onChange, type, required }) => (
     <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-        <div className="relative">
-            <input
-                value={value}
-                onChange={onChange}
-                type={type}
-                className="w-full border border-gray-300 rounded-lg p-3 pl-4 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition"
-                required={required}
-                placeholder={`Enter your ${label.toLowerCase()}`}
-            />
-        </div>
+        <label className="block text-sm font-semibold text-gray-200 mb-1">{label}</label>
+        <input value={value} onChange={onChange} type={type} required={required}
+            className="w-full border border-gray-700 rounded-xl p-4 pl-5 bg-gray-900 text-gray-200 focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 transition text-lg placeholder-gray-500" 
+            placeholder={`Enter your ${label.toLowerCase()}`} />
     </div>
 );

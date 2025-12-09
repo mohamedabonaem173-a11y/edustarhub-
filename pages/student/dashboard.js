@@ -1,247 +1,148 @@
-// pages/student/dashboard.js - PURE SUPABASE CHECK
+// pages/student/dashboard.js
+import { useState, useEffect } from "react";
+import Navbar from "../../components/Navbar";
+import Sidebar from "../../components/Sidebar";
 
-import { useState, useEffect, useCallback } from 'react';
-import Navbar from '../../components/Navbar'; 
-import Sidebar from '../../components/Sidebar';
-import { supabase } from '../../lib/supabaseClient'; 
-import Link from 'next/link';
-import { useRouter } from 'next/router'; // NEW IMPORT
+// Fun quotes
+const funnyQuotes = [
+  "Your brain is a supercomputer. Don't forget to plug in. 🤯",
+  "Keep calm and pretend you understand everything. 😎",
+  "Math is hard, coffee is easy. ☕",
+  "Learning today, bossing tomorrow. 💪",
+  "Brain loading… please wait… 🧠💻",
+  "Knowledge is power… and snacks are life. 🍕",
+  "Turn that frown into a degree! 🎓",
+  "One small step for study, one giant leap for your GPA!"
+];
 
-const RESOURCES_TABLE = 'resources'; 
+const randomNumber = (max) => Math.floor(Math.random() * max);
+
+// Neon tech-style StatCard
+const StatCard = ({ title, value, icon, color, progress }) => (
+  <div className={`relative p-6 rounded-2xl shadow-[0_0_20px_${color}] border-2 border-${color} bg-black/20 hover:scale-105 transition-transform cursor-pointer`}>
+    <div
+      className={`w-16 h-16 flex items-center justify-center rounded-full mb-4 ${color} text-black text-4xl`}
+    >
+      {icon}
+    </div>
+    <p className="text-sm font-semibold text-gray-300">{title}</p>
+    <h2 className="text-2xl font-bold text-white mt-1">{value}</h2>
+    {progress && (
+      <div className="w-full bg-gray-700 h-2 rounded-full mt-3">
+        <div
+          className={`h-2 rounded-full ${color}`}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    )}
+    <div className={`absolute top-2 right-2 text-${color} text-xl animate-pulse select-none`}>⚡</div>
+  </div>
+);
 
 export default function StudentDashboard() {
-    const role = 'student';
-    const router = useRouter(); // Initialize router
-    const [userId, setUserId] = useState(null);
-    const [loading, setLoading] = useState(true); // Control overall loading
-    const [resources, setResources] = useState([]);
-    const [error, setError] = useState(null);
-    
-    // State to manage the setup check separately
-    const [setupChecked, setSetupChecked] = useState(false); 
+  const role = "student";
+  const [quote, setQuote] = useState("");
+  const [stats, setStats] = useState({
+    gamePoints: 0,
+    resourcesDownloaded: 0,
+    buddyName: "Buddy",
+    motivation: "Keep going!",
+  });
 
-    // 🛑 MANDATORY BUDDY SETUP REDIRECTION CHECK (SUPABASE) 🛑
-    useEffect(() => {
-        const checkBuddySetup = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            const user = session?.user;
+  useEffect(() => {
+    setStats({
+      gamePoints: randomNumber(500),
+      resourcesDownloaded: randomNumber(50),
+      buddyName: ["Alex", "Jamie", "Taylor", "Sam"][randomNumber(4)],
+      motivation: ["You got this!", "Keep going!", "Almost there!"][randomNumber(3)],
+    });
 
-            if (!user) {
-                // If not logged in, let the standard login flow handle redirection
-                setSetupChecked(true); 
-                return;
-            }
+    setQuote(funnyQuotes[randomNumber(funnyQuotes.length)]);
+  }, []);
 
-            try {
-                // Fetch the 'buddy_name' column from the student's profile
-                const { data: profile, error } = await supabase
-                    .from('profiles')
-                    .select('buddy_name')
-                    .eq('id', user.id)
-                    .single();
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] font-sans relative overflow-hidden">
+      {/* Navbar */}
+      <Navbar userRole="Student" />
 
-                if (error) throw error;
+      <div className="max-w-7xl mx-auto flex pt-6 gap-6">
+        {/* Sidebar */}
+        <Sidebar role={role} />
 
-                if (!profile.buddy_name) {
-                    // Buddy name is null or empty, force setup
-                    router.replace('/student/buddy-setup');
-                } else {
-                    // Setup is complete, proceed with dashboard loading
-                    setSetupChecked(true);
-                }
-            } catch (err) {
-                console.error("Error checking buddy setup:", err);
-                // On error, assume they need setup or try again
-                router.replace('/student/buddy-setup');
-            }
-        };
-
-        checkBuddySetup();
-    }, [router]);
-    // ----------------------------------------------
-
-
-    // --- User Initialization (Runs after setup check) ---
-    useEffect(() => {
-        async function getUserId() {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                setUserId(session.user.id);
-            }
-        }
-        getUserId();
-    }, []);
-
-    // --- Fetch ALL resources for the Student Dashboard ---
-    const fetchAllResources = useCallback(async () => {
-        if (!setupChecked) return; // Wait until setup check is done
-
-        setLoading(true);
-        setError(null);
-        
-        try {
-            const { data, error } = await supabase
-                .from(RESOURCES_TABLE)
-                .select('id, title, category, created_at, url, file_type') 
-                .order('created_at', { ascending: false })
-                .limit(5);
-
-            if (error) throw error;
-            
-            setResources(data);
-
-        } catch (err) {
-            console.error("Error fetching student resources on dashboard:", err);
-            setError('Failed to load resources from the database.');
-        } finally {
-            setLoading(false);
-        }
-    }, [setupChecked]); // DEPENDENCY ADDED
-
-    useEffect(() => {
-        fetchAllResources();
-    }, [fetchAllResources]); 
-
-    const getLoggedInUserName = () => {
-        // Placeholder, integrate user fetching logic later
-        return "Learner";
-    }
-
-    // --- Placeholder Data for Gamification ---
-    const gamePoints = 40;
-    const downloadedCount = 0; 
-    const totalResources = resources.length;
-    const learningProgress = totalResources > 0 ? Math.round((downloadedCount / totalResources) * 100) : 0;
-    const hasBadges = false; 
-    const recentResourcesCount = resources.length;
-    
-    // --- Helper Component for Styled Stats Cards (using simple text/emojis) ---
-    const StatCard = ({ title, value, detail, icon, iconColor, linkHref }) => {
-        const content = (
-            <div className="bg-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition duration-300 border-t-4 border-b-4 border-transparent hover:border-indigo-500 cursor-pointer flex items-start space-x-4">
-                <div className={`p-3 rounded-full ${iconColor} bg-opacity-10 text-2xl`}>
-                    {icon}
-                </div>
-                <div>
-                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
-                    <p className="text-4xl font-extrabold text-gray-900 mt-1">{value}</p>
-                    {detail && <p className={`text-xs mt-2 ${iconColor.replace('text', 'text-opacity-80')}`}>{detail}</p>}
-                </div>
+        {/* Main Content */}
+        <div className="flex-1 relative">
+          <main className="p-6 space-y-10">
+            {/* Welcome */}
+            <div className="relative bg-black/20 backdrop-blur-md rounded-3xl shadow-[0_0_40px_cyan] p-8 text-white flex flex-col md:flex-row items-center overflow-hidden border-2 border-cyan-500">
+              <div className="space-y-3">
+                <h1 className="text-4xl md:text-5xl font-extrabold text-cyan-400">
+                  Welcome Back, Student!
+                </h1>
+                <p className="text-lg md:text-xl italic text-blue-300">"{quote}"</p>
+              </div>
             </div>
-        );
 
-        return linkHref ? (
-            <Link 
-                href={linkHref} 
-                className="block" // Use modern Link usage
-            >
-                {content}
-            </Link>
-        ) : (
-            content
-        );
-    };
-
-    // Show a loading screen while we check Supabase OR if resources are loading
-    if (!setupChecked || loading) { 
-        return (
-            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-                <div className="text-center">
-                    <p className="text-2xl font-semibold text-indigo-600 mb-2">Initializing Student Portal...</p>
-                    <p className="text-gray-500">Please wait while we check your profile settings.</p>
-                </div>
-            </div>
-        );
-    }
-
-    // Main Dashboard Render
-    return (
-        <div className="min-h-screen bg-gray-100"> 
-            <Navbar userRole="Student" /> 
-            
-            <div className="max-w-7xl mx-auto flex pt-4"> 
-                <Sidebar role={role} />
-                
-                <main className="flex-1 p-8">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome Back, <span className="text-indigo-600">{getLoggedInUserName()}!</span></h1>
-                    <p className="text-gray-500 mb-10">Your journey through the arena continues. View your progress below.</p>
-                    
-                    {/* --- GAMIFICATION STATS GRID --- */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-                        
-                        <StatCard
-                            title="Game Points"
-                            value={gamePoints}
-                            detail="Go to the arena to earn more points!"
-                            icon="⚡"
-                            iconColor="text-yellow-500"
-                            linkHref="/student/games"
-                        />
-                        
-                        <StatCard
-                            title="Learning Progress"
-                            value={`${learningProgress}%`}
-                            detail={`Completed ${downloadedCount} of ${totalResources} resources.`}
-                            icon="📈" 
-                            iconColor="text-blue-500"
-                        />
-
-                        <StatCard
-                            title="Achievements"
-                            value={hasBadges ? '1 Badge' : 'N/A'}
-                            detail={hasBadges ? 'You earned a badge! View details.' : 'No badges earned yet.'}
-                            icon="🏅"
-                            iconColor="text-purple-500"
-                        />
-                    </div>
-
-                    {/* --- RECENT RESOURCES SECTION --- */}
-                    <div className="bg-white p-8 rounded-2xl shadow-xl">
-                        <div className="flex justify-between items-center mb-6 border-b pb-4">
-                            <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                                📚 Recently Added Resources 
-                            </h2>
-                            <span className="text-sm font-semibold text-gray-500 bg-indigo-50 px-3 py-1 rounded-full">{recentResourcesCount} Total</span>
-                        </div>
-                        
-                        {error && (
-                            <div className="p-4 mb-4 rounded-lg font-medium bg-red-100 text-red-700">
-                                **Database Error:** {error}
-                            </div>
-                        )}
-
-                        {resources.length === 0 ? (
-                            <p className="text-gray-500 p-4 border rounded-lg bg-gray-50">No recent resources found. Ask your teacher to upload some!</p>
-                        ) : (
-                            <ul className="divide-y divide-gray-200">
-                                {resources.map((resource) => (
-                                    <li key={resource.id} className="py-4 flex justify-between items-center transition duration-150 hover:bg-gray-50 rounded-lg px-2 -mx-2">
-                                        <div className="flex-1 min-w-0">
-                                            <a 
-                                                href={resource.url}
-                                                target="_blank" 
-                                                rel="noopener noreferrer" 
-                                                className="text-lg font-semibold text-indigo-600 hover:text-indigo-800 transition truncate block"
-                                            >
-                                                {resource.title}
-                                            </a>
-                                            <p className="text-sm text-gray-500 mt-1">
-                                                Category: <span className="font-medium text-gray-700">{resource.category}</span>
-                                                <span className="mx-2">•</span>
-                                                Type: <span className="font-medium text-purple-600">{(resource.file_type || 'N/A').toUpperCase()}</span>
-                                            </p>
-                                        </div>
-                                        <span className="text-xs text-gray-400 ml-4">{new Date(resource.created_at).toLocaleDateString()}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                        <Link href="/student/resources" className="mt-6 inline-flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition border-b border-dashed border-indigo-400">
-                            View all resources and subjects →
-                        </Link>
-                    </div>
-                </main>
-            </div>
+            {/* Stats Cards */}
+            <section>
+              <h2 className="text-2xl font-bold text-cyan-400 mb-6 text-shadow-lg">
+                Your Stats
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <StatCard
+                  title="Game Points"
+                  value={stats.gamePoints}
+                  icon="🎮"
+                  color="text-purple-500"
+                  progress={(stats.gamePoints % 100) + 1}
+                />
+                <StatCard
+                  title="Resources Downloaded"
+                  value={stats.resourcesDownloaded}
+                  icon="📚"
+                  color="text-blue-500"
+                  progress={(stats.resourcesDownloaded * 2) % 100}
+                />
+                <StatCard
+                  title="Buddy Name"
+                  value={stats.buddyName}
+                  icon="👯"
+                  color="text-pink-500"
+                />
+                <StatCard
+                  title="Motivation"
+                  value={stats.motivation}
+                  icon="🔥"
+                  color="text-green-500"
+                />
+              </div>
+            </section>
+          </main>
         </div>
-    );
+      </div>
+
+      {/* Techy background glows */}
+      <div className="absolute inset-0 pointer-events-none">
+        {[...Array(60)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full opacity-50 animate-pulse"
+            style={{
+              width: `${Math.random() * 3 + 1}px`,
+              height: `${Math.random() * 3 + 1}px`,
+              backgroundColor: `rgba(0,255,255,${Math.random()})`,
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 5}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      <style jsx>{`
+        .text-shadow-lg {
+          text-shadow: 0 2px 8px rgba(0,255,255,0.6);
+        }
+      `}</style>
+    </div>
+  );
 }

@@ -1,43 +1,38 @@
 // pages/teacher/quiz-maker.js
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import Navbar from '../../components/Navbar';
 import Sidebar from '../../components/Sidebar';
 import { useRouter } from 'next/router';
 
-// --- 1. Supabase Configuration (HARDCODED) ---
-// 🛑 WARNING: Replace these placeholders with your actual keys.
+// --- Supabase config ---
 const SUPABASE_URL = "https://zuafcjaseshxjcptfhkg.supabase.co"; 
 const SUPABASE_ANON_KEY = "sb_publishable_nSzApJy-q9gkhOjgf00VfA_vr_04rBR"; 
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// --- 2. Constants & Initial State ---
+// --- Initial question structure ---
 const EMPTY_QUESTION_STRUCTURE = {
     question_text: '',
-    type: 'multiple-choice', // Default to multiple-choice
+    type: 'multiple-choice',
     options: ['', '', '', ''],
     correct_answer: '',
     explanation: '',
 };
 
-const MOCK_USER_ID = '00000000-0000-0000-0000-000000000000'; 
+const MOCK_USER_ID = '00000000-0000-0000-0000-000000000000';
 
-// --- 3. Component Start ---
 function QuizMaker() {
-    const router = useRouter(); 
+    const router = useRouter();
     const [quizTitle, setQuizTitle] = useState('');
     const [topic, setTopic] = useState('');
     const [numQuestions, setNumQuestions] = useState(5);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [questions, setQuestions] = useState([EMPTY_QUESTION_STRUCTURE]);
-    
-    // --- 4. Question Management Functions (No change) ---
-    const addQuestion = () => {
-        setQuestions([...questions, EMPTY_QUESTION_STRUCTURE]);
-    };
+
+    // --- Question Management ---
+    const addQuestion = () => setQuestions([...questions, EMPTY_QUESTION_STRUCTURE]);
 
     const updateQuestion = useCallback((index, field, value) => {
         const newQuestions = questions.map((q, i) => {
@@ -54,83 +49,63 @@ function QuizMaker() {
         });
         setQuestions(newQuestions);
     }, [questions]);
-    
-    // --- 5. AI Generation Logic (No change in this file) ---
+
+    // --- AI Quiz Generation ---
     const handleGenerateQuiz = async () => {
         if (!topic || numQuestions <= 0) {
             setError("Please enter a topic and number of questions.");
             return;
         }
-
         setLoading(true);
         setError(null);
-
         try {
-            // This fetch calls the backend API route, which needs the Gemini Key.
             const response = await fetch('/api/generate-quiz', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ topic, count: numQuestions }),
             });
-
             const result = await response.json();
-
-            if (!response.ok || result.error) {
-                throw new Error(result.error || 'Failed to generate quiz from AI.');
-            }
-
+            if (!response.ok || result.error) throw new Error(result.error || 'Failed to generate quiz.');
             setQuizTitle(result.title);
             setQuestions(result.questions);
-
         } catch (err) {
-            console.error("AI Quiz Generation Error:", err);
-            setError(`Error Generating Quiz: ${err.message}`);
+            console.error(err);
+            setError(`Error: ${err.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    // --- 6. Supabase Save Logic (No change) ---
+    // --- Supabase Save Quiz ---
     const handleSaveQuiz = async () => {
         if (!quizTitle || questions.length === 0 || questions.some(q => !q.question_text)) {
             alert("Please ensure the quiz has a title and at least one complete question.");
             return;
         }
-        
-        const finalUserId = MOCK_USER_ID; 
 
-        const quizDataToSend = {
-            title: quizTitle,
-            quiz_data: questions, 
-            teacher_id: finalUserId,
-        };
+        const finalUserId = MOCK_USER_ID;
+        const quizDataToSend = { title: quizTitle, quiz_data: questions, teacher_id: finalUserId };
 
         try {
-            const { data, error } = await supabase
-                .from('quizzes')
-                .insert([quizDataToSend]);
-
+            const { data, error } = await supabase.from('quizzes').insert([quizDataToSend]);
             if (error) {
-                console.error("Supabase Save Error:", error);
-                alert(`🛑 Failed to save quiz. Supabase error: ${error.message}. Please check your keys and RLS policy.`);
+                console.error(error);
+                alert(`🛑 Failed to save quiz: ${error.message}`);
                 setError(`Supabase error: ${error.message}`);
             } else {
-                alert("✅ Success! Quiz saved to the server.");
+                alert("✅ Success! Quiz saved.");
                 router.push('/teacher/quiz-manage');
             }
-        } catch (error) {
-            console.error("Client Save Error:", error);
-            alert("An unexpected error occurred during save.");
-            setError("An unexpected client error occurred.");
+        } catch (err) {
+            console.error(err);
+            setError("Unexpected client error.");
         }
     };
 
-
-    // --- 7. JSX Rendering (No change) ---
+    // --- Render each question ---
     const renderQuestion = (q, index) => (
         <div key={index} className="bg-white p-6 rounded-lg shadow-md mb-4">
             <h3 className="text-xl font-semibold mb-3 text-gray-700">Question {index + 1}</h3>
-            
             <textarea
                 className="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:ring-violet-500 focus:border-violet-500"
                 value={q.question_text}
@@ -138,7 +113,6 @@ function QuizMaker() {
                 placeholder="Enter the question text"
                 rows="2"
             />
-            
             <div className="space-y-2">
                 {q.options.map((option, optIndex) => (
                     <div key={optIndex} className="flex items-center space-x-2">
@@ -153,13 +127,7 @@ function QuizMaker() {
                             <input
                                 type="checkbox"
                                 checked={q.correct_answer === option && option !== ''}
-                                onChange={() => 
-                                    updateQuestion(
-                                        index, 
-                                        'correct_answer', 
-                                        q.correct_answer === option ? '' : option
-                                    )
-                                }
+                                onChange={() => updateQuestion(index, 'correct_answer', q.correct_answer === option ? '' : option)}
                                 className="form-checkbox text-green-500"
                                 disabled={option === ''}
                             />
@@ -168,7 +136,6 @@ function QuizMaker() {
                     </div>
                 ))}
             </div>
-
             <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Explanation/Feedback:</label>
                 <textarea
@@ -182,22 +149,80 @@ function QuizMaker() {
         </div>
     );
 
+    // --- Techy Background Animation ---
+    useEffect(() => {
+        const canvas = document.getElementById('techy-bg');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const nodes = Array.from({ length: 50 }, () => ({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            vx: (Math.random() - 0.5) * 1,
+            vy: (Math.random() - 0.5) * 1,
+        }));
+
+        function animate() {
+            ctx.fillStyle = 'rgba(0,0,0,0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            nodes.forEach((node, i) => {
+                node.x += node.vx;
+                node.y += node.vy;
+                if (node.x < 0 || node.x > canvas.width) node.vx *= -1;
+                if (node.y < 0 || node.y > canvas.height) node.vy *= -1;
+
+                ctx.fillStyle = '#8A2BE2';
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                for (let j = i + 1; j < nodes.length; j++) {
+                    const dx = nodes[j].x - node.x;
+                    const dy = nodes[j].y - node.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 150) {
+                        ctx.strokeStyle = `rgba(138,43,226,${1 - dist / 150})`;
+                        ctx.beginPath();
+                        ctx.moveTo(node.x, node.y);
+                        ctx.lineTo(nodes[j].x, nodes[j].y);
+                        ctx.stroke();
+                    }
+                }
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    }, []);
+
+    // --- Render page ---
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="relative min-h-screen overflow-hidden bg-black">
+            {/* Techy background canvas */}
+            <canvas id="techy-bg" className="absolute inset-0 w-full h-full z-0"></canvas>
+
+            {/* Foreground content */}
             <Navbar userRole="Teacher" />
-            <div className="max-w-7xl mx-auto flex pt-4">
+            <div className="max-w-7xl mx-auto flex pt-4 relative z-10">
                 <Sidebar role="teacher" />
                 <main className="flex-1 p-8">
-                    <h1 className="text-4xl font-extrabold text-gray-900 mb-8 border-b pb-2">🧠 AI Quiz Maker</h1>
-                    
-                    {/* Input Area for AI Generation */}
+                    <h1 className="text-4xl font-extrabold text-gray-200 mb-8 border-b pb-2">🧠 AI Quiz Maker</h1>
+
+                    {/* Input Area */}
                     <div className="bg-white p-6 rounded-xl shadow-lg mb-8">
                         <h2 className="text-2xl font-bold text-gray-800 mb-4">Generate Quiz from Topic</h2>
                         <div className="space-y-4">
                             <input
                                 type="text"
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-violet-500 focus:border-violet-500"
-                                placeholder="Enter the subject or topic (e.g., 'The Battle of Gettysburg')"
+                                placeholder="Enter the subject or topic"
                                 value={topic}
                                 onChange={(e) => setTopic(e.target.value)}
                             />
@@ -223,9 +248,8 @@ function QuizMaker() {
                         {error && <p className="mt-4 text-red-500 font-medium">Error: {error}</p>}
                     </div>
 
-                    {/* Quiz Editing Area */}
-                    <h2 className="text-3xl font-extrabold text-gray-900 mb-6">Edit Final Quiz Structure</h2>
-                    
+                    {/* Quiz Editing */}
+                    <h2 className="text-3xl font-extrabold text-gray-200 mb-6">Edit Final Quiz Structure</h2>
                     <input
                         type="text"
                         className="w-full p-4 border-2 border-gray-300 rounded-xl text-2xl font-bold mb-6 focus:border-green-500"
@@ -233,9 +257,7 @@ function QuizMaker() {
                         value={quizTitle}
                         onChange={(e) => setQuizTitle(e.target.value)}
                     />
-
                     {questions.map(renderQuestion)}
-                    
                     <div className="flex justify-between items-center mt-6">
                         <button
                             onClick={addQuestion}
@@ -243,7 +265,6 @@ function QuizMaker() {
                         >
                             + Add Question Manually
                         </button>
-                        
                         <button
                             onClick={handleSaveQuiz}
                             className="bg-green-600 text-white px-8 py-3 rounded-lg font-extrabold shadow-xl hover:bg-green-700 transition-colors"
@@ -251,7 +272,6 @@ function QuizMaker() {
                             SAVE FINAL QUIZ
                         </button>
                     </div>
-
                 </main>
             </div>
         </div>
