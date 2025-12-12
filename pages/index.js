@@ -1,192 +1,261 @@
-// pages/index.js
+import { useState, useEffect } from "react";
+import Link from "next/link";
 
 export default function Home() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0f1f] to-[#1a2240] text-[#e0e6ff]">
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [animateFeature, setAnimateFeature] = useState([false, false, false]);
 
-      {/* ========================================================= */}
-      {/* TRUST BANNER */}
-      <div id="top-trust-banner" className="w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-blue-500 py-2 text-center shadow-md border-b border-white/20 overflow-hidden">
-        <div className="text-white font-semibold tracking-wide">
-          <span className="text-yellow-300 mr-2">⭐</span>
-          Trusted Partner of Malvern College Egypt • IGCSE / GCSE Excellence • 100% Mastery-Driven Learning
-          <span className="text-yellow-300 ml-2">⭐</span>
+  // --- Design Constants ---
+  const MAIN_BG = "bg-white";
+  const PRIMARY_ACCENT = "text-red-600";
+  const PRIMARY_BG_ACCENT = "bg-red-600";
+  const TEXT_COLOR = "text-gray-900";
+  const CARD_BG = "bg-gray-100";
+  const SECONDARY_TEXT_COLOR = "text-gray-600";
+  const BORDER_COLOR = "border-gray-200";
+  const DRAWER_BG = "bg-gray-900";
+  const DRAWER_TEXT_COLOR = "text-white";
+  const DRAWER_ACCENT_COLOR = "text-red-500";
+
+  // --- Navigation Data ---
+  const fullPageNavItems = ["methodology", "features", "pricing", "contact", "aboutUs", "academicSupport", "faq"];
+  const navItems = ["home", ...fullPageNavItems];
+
+  const tabDisplayNames = {
+    home: "Home",
+    methodology: "Methodology",
+    terms: "TOS/Copyright",
+    aboutUs: "About Us",
+    features: "Features",
+    academicSupport: "Academic Support",
+    faq: "FAQ",
+    pricing: "Pricing",
+    success: "Success",
+    contact: "Contact",
+  };
+
+  // --- Content Data ---
+  const testimonials = [
+    { name: "Hope", quote: "EDUSTARHUB changed how I prepare for exams. The content is concise and the dashboard keeps me completely focused. I saw a huge jump in my scores!" },
+    { name: "Karim", quote: "The interactive revision tools are a game-changer. I finally feel like I understand the physics concepts, not just memorizing them. Platform is very good." },
+    { name: "Omar", quote: "I love the clean, easy-to-use interface. It makes organizing my IGCSE notes effortless. Highly recommend for any student feeling overwhelmed." },
+    { name: "Ahmed", quote: "The teachers' resources are top-notch. It's like having the best tutor available 24/7. Platform is very good!" },
+    { name: "Gabriel", quote: "I was struggling with Biology, but Dr. Yusuf’s lessons are incredibly clear and engaging. The progress tracking motivates me daily." },
+    { name: "Layla", quote: "Studying doesn't feel like a chore anymore. EDUSTARHUB is genuinely designed with the student in mind. My confidence is through the roof." },
+    { name: "Noah", quote: "I finally found one place for all my subjects. No more switching between websites and losing track of my goals. Platform is very good!" },
+  ];
+
+  const faqItems = [
+    { question: "Which exam boards and subjects do you cover?", answer: "We focus primarily on IGCSE and GCSE curricula, covering core subjects like Physics, Biology, Chemistry, and Math. We are constantly expanding our subject library." },
+    { question: "How long is the 'Early Access' free?", answer: "Early Access is free indefinitely for the first group of users who sign up. We will announce pricing for new users well in advance once the platform exits the Early Access phase." },
+    { question: "Is the content created by real teachers?", answer: "Yes, every quiz, resource, and practice test is designed and verified by experienced, certified educators specializing in the GCSE and IGCSE systems." },
+    { question: "How does the platform help me track my progress?", answer: "Our dashboard provides visual reports on quiz scores, time spent studying, and mastery levels for each topic, giving you clear insights into where you need to focus." },
+  ];
+
+  const termsContent = {
+    title: "Terms of Service & Copyright Agreement (The Huge Contract)",
+    sections: [
+      {
+        heading: "1. Ownership and Intellectual Property (The Core Agreement)",
+        content: "All content, resources, text, design, graphics, quizzes, lessons, course materials, educator profiles, and underlying software code ('The Content') published or made available on the EDUSTARHUB platform are the **sole and exclusive property of EDUSTARHUB**, protected under international copyright, trademark, and intellectual property laws. **All rights are expressly reserved by EDUSTARHUB.**",
+      },
+      {
+        heading: "2. Permitted Educational Use (Non-Commercial License)",
+        content: "EDUSTARHUB grants registered users a limited, non-exclusive, non-transferable license to access and use The Content strictly for **personal, non-commercial educational purposes**, such as studying, personal revision, and self-assessment. This license is revoked immediately upon unauthorized commercial use or breach of these terms.",
+      },
+      {
+        heading: "3. STRICTLY PROHIBITED COMMERCIAL USE AND REDISTRIBUTION",
+        content: "Users are **EXPRESSLY AND STRICTLY PROHIBITED** from using, reproducing, or distributing The Content for **ANY COMMERCIAL PURPOSE WHATSOEVER**. Prohibited activities include, but are not limited to: <ul><li>**Selling, licensing, renting, or leasing** any part of The Content, including digital copies of quizzes or notes.</li><li>Using The Content to prepare materials for commercial tutoring, private courses, or external training programs.</li><li>Posting or uploading The Content to any public forum, website, file-sharing service, or repository (e.g., GitHub, Chegg, Course Hero) for public or non-personal access.</li><li>Reproducing, copying, or distributing The Content, whether digitally or in print, for sale, profit, or mass dissemination.</li><li>**Reverse engineering** or attempting to derive the source code or proprietary methodology of the platform.</li></ul>Any unauthorized commercial use constitutes a severe violation of copyright and will result in **immediate termination of the user account and aggressive legal action** to the fullest extent permitted by international law, seeking both injunctive relief and monetary damages.",
+      },
+      {
+        heading: "4. Digital Millennium Copyright Act (DMCA) Compliance",
+        content: "EDUSTARHUB actively enforces its copyright. Any unauthorized use of EDUSTARHUB content found outside the platform should be reported immediately via the Contact tab. We fully comply with the DMCA and other international statutes to protect our proprietary materials.",
+      },
+    ],
+  };
+
+  const methodologyContent = {
+    title: "Our Learning Methodology: How EDUSTARHUB Guarantees Mastery",
+    points: [
+      { icon: "🧠", title: "Assess & Target", description: "We start with adaptive quizzes to identify your exact weaknesses. We don't waste time on what you already know, focusing your energy where it matters most." },
+      { icon: "🔬", title: "Interactive Deep Dive", description: "Lessons move beyond static text. Our expert-led videos, simulations, and interactive tools ensure you build deep conceptual understanding, not just surface knowledge." },
+      { icon: "🏆", title: "Validate & Achieve", description: "Final mastery quizzes and simulated exam papers validate your learning. Our progress trackers provide clear, actionable feedback, transforming weakness into confidence and success." },
+    ],
+  };
+
+  // --- Animate Features on Load ---
+  useEffect(() => {
+    if (animateFeature.every(a => a === false)) {
+      setAnimateFeature([true, false, false]);
+      const timers = [
+        setTimeout(() => setAnimateFeature([true, true, false]), 300),
+        setTimeout(() => setAnimateFeature([true, true, true]), 600),
+      ];
+      return () => timers.forEach(t => clearTimeout(t));
+    }
+  }, []);
+
+  const handleNavClick = (tabId) => {
+    setIsMenuOpen(false);
+    const element = document.getElementById(tabId);
+    if (element) element.scrollIntoView({ behavior: "smooth" });
+    else window.location.href = tabId === "home" ? "/" : `/${tabId}`;
+  };
+
+  return (
+    <div className={`font-sans ${TEXT_COLOR} ${MAIN_BG} min-h-screen`}>
+
+      {/* Drawer Menu */}
+      <div className={`fixed top-0 right-0 h-full w-full md:w-1/2 lg:w-1/3 ${DRAWER_BG} z-50 transition-transform duration-300 ${isMenuOpen ? "translate-x-0" : "translate-x-full"}`} onClick={() => setIsMenuOpen(false)}>
+        <div className="h-full p-10 overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="flex justify-end mb-16">
+            <button className={`px-4 py-2 rounded-full flex items-center space-x-2 ${PRIMARY_BG_ACCENT} text-white font-semibold transition hover:bg-red-700`} onClick={() => setIsMenuOpen(false)}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span>Close</span>
+            </button>
+          </div>
+
+          {/* Navigation */}
+          <ul className="space-y-6 mt-10 text-left">
+            {navItems.map(tab => (
+              <li key={tab}>
+                <Link href={tab === "home" ? "/" : `/${tab}`} onClick={() => setIsMenuOpen(false)}
+                  className={`flex items-center space-x-4 text-4xl font-extrabold transition ${DRAWER_TEXT_COLOR} hover:${DRAWER_ACCENT_COLOR}`}>
+                  <span className={`${DRAWER_ACCENT_COLOR} text-4xl leading-none`}>●</span>
+                  <span className={DRAWER_TEXT_COLOR}>{tabDisplayNames[tab]}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-6 py-20">
-        <div className="grid md:grid-cols-2 gap-16 items-center">
-
-          {/* Left Column */}
-          <div>
-            <h1 className="text-6xl md:text-8xl font-extrabold leading-tight tracking-tight bg-clip-text text-white">
-              EDUSTARHUB — <br className="hidden md:inline" />
-              Focus on Mastery, <br className="hidden md:inline" />
-              Not Management.
-            </h1>
-
-            <p className="mt-8 text-indigo-100 text-2xl font-light leading-relaxed">
-              A unified platform dedicated to improving GCSE and IGCSE outcomes through 
-              <strong className="text-cyan-300"> structured, adaptive practice</strong> and seamless 
-              organization of teacher-created resources. We give educators the tools to focus on what 
-              matters most — <strong className="text-cyan-300">student mastery</strong>.
-            </p>
-
-            <div className="mt-12 flex space-x-6">
-              <a 
-                href="/auth" 
-                className="px-10 py-4 rounded-full bg-gradient-to-r from-indigo-600 to-cyan-500 text-white font-bold text-lg shadow-[0_0_20px_rgba(56,189,248,0.6)] transition duration-300 transform hover:-translate-y-1"
-              >
-                Explore the Platform
-              </a>
-
-              <a 
-                className="px-10 py-4 rounded-full border border-cyan-300 bg-[#0f1530] text-cyan-200 font-semibold shadow-md hover:bg-[#1b2550] transition duration-300" 
-                href="#partnership"
-              >
-                View Partnership Story
-              </a>
-            </div>
+      <main>
+        {/* --- Hero Section --- */}
+        <section id="home" className="relative h-screen w-full">
+          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('/online.jpg')" }}>
+            <div className="absolute inset-0 bg-black/50"></div>
           </div>
 
-          {/* Right Column */}
-          <div>
-            <div className="bg-[#11172e] rounded-3xl p-10 shadow-2xl border-t-4 border-cyan-400 transform transition-all duration-500">
-              <h3 className="text-2xl font-bold text-cyan-300 mb-6 flex items-center">
-                📚 Core Pillars of EDUSTARHUB
-              </h3>
-              <ul className="space-y-5 text-indigo-100 text-lg">
-                <li className="flex items-start">
-                  <span className="text-cyan-400 text-2xl mr-4 -mt-1">✨</span> 
-                  <strong className="text-cyan-300">Structured Assessment:</strong> Create and deploy comprehensive, standards-aligned practice tests effortlessly.
-                </li>
-                <li className="flex items-start">
-                  <span className="text-cyan-400 text-2xl mr-4 -mt-1">✅</span>
-                  <strong className="text-cyan-300">Mastery Tracking:</strong> Automated scoring and analysis shift the focus to student progress, not just grading.
-                </li>
-                <li className="flex items-start">
-                  <span className="text-cyan-400 text-2xl mr-4 -mt-1">🧠</span>
-                  <strong className="text-cyan-300">Guided Revision:</strong> Every question includes detailed explanations to guide student learning.
-                </li>
-                <li className="flex items-start">
-                  <span className="text-cyan-400 text-2xl mr-4 -mt-1">📂</span> 
-                  Seamless centralized organization of all classroom resources.
-                </li>
-              </ul>
-            </div>
+          {/* Logo */}
+          <div className="absolute top-8 left-6 z-40">
+            <Link href="/">
+              <div className="flex items-center space-x-2 cursor-pointer">
+                <div className={`text-4xl font-extrabold ${PRIMARY_ACCENT}`}>M</div>
+                <div className="text-xl font-extrabold tracking-tight text-white">EDUSTARHUB</div>
+              </div>
+            </Link>
           </div>
-        </div>
 
-        {/* PARTNERSHIP SECTION */}
-        <section id="partnership" className="mt-28 md:mt-40 p-8 md:p-16 bg-[#0f1530] rounded-[40px] shadow-3xl border-2 border-cyan-400">
-          <div className="grid md:grid-cols-3 gap-10 items-center">
-            <div className="md:col-span-2">
-              <p className="text-sm tracking-widest font-extrabold text-cyan-300 uppercase mb-3 bg-[#1b2550] px-3 py-1 inline-block rounded-full">
-                OFFICIAL EDUCATIONAL PARTNERSHIP
-              </p>
-              <h2 className="text-4xl md:text-5xl font-extrabold text-indigo-200 leading-tight hover:underline decoration-cyan-400 decoration-4 underline-offset-4 transition">
-                Trusted by Malvern College Egypt
-              </h2>
-              <p className="mt-4 text-indigo-200 text-xl leading-relaxed max-w-2xl">
-                Our collaboration with one of Egypt's leading educational institutions ensures that our platform meets the highest standards for IGCSE and GCSE exam preparation. This is our benchmark for quality.
-              </p>
-              <a
-                href="/malvern-exclusive-page"
-                className="mt-8 inline-block px-8 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 text-white font-bold text-lg shadow-lg transition duration-300 transform hover:-translate-y-0.5"
-              >
-                See Our Impact at Malvern
-              </a>
-            </div>
-            <div className="relative h-48 md:h-64 rounded-2xl overflow-hidden shadow-2xl">
-              <img 
-                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5Mh32z2R2BuD_1gtNpGqI_C5llNRa-lBTWg&s"
-                alt="Malvern College Egypt Campus"
-                className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#00000088] to-transparent"></div>
-            </div>
-          </div>
-        </section>
+          {/* Menu & Sign In */}
+          <div className={`absolute top-8 right-6 z-[51] flex space-x-4 items-center ${isMenuOpen ? 'hidden' : 'flex'}`}>
+            <Link href="/auth">
+              <button className={`w-10 h-10 rounded-full flex items-center justify-center ${PRIMARY_BG_ACCENT} text-white hover:bg-red-700 shadow-md`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </button>
+            </Link>
 
-        {/* VALUE PROPOSITION */}
-        <section id="value" className="mt-32 py-16">
-          <h2 className="text-4xl font-extrabold mb-12 text-center text-cyan-300 tracking-wide">
-            Commitment to High-Quality Education
-          </h2>
-          <div className="grid md:grid-cols-2 gap-10">
-            <div className="p-10 bg-[#11172e] rounded-2xl shadow-xl border-l-4 border-cyan-400 hover:shadow-2xl transition duration-300">
-              <h3 className="text-3xl font-bold text-indigo-200 mb-4 flex items-center">
-                👨‍🏫 For Educators: Efficiency & Focus
-              </h3>
-              <ul className="space-y-3 text-indigo-200 text-lg">
-                <li className="flex items-start"><span className="text-cyan-400 text-xl mr-3">•</span> <strong>Content Creation:</strong> Quickly generate high-quality practice tests from any topic or document.</li>
-                <li className="flex items-start"><span className="text-cyan-400 text-xl mr-3">•</span> <strong>Consistency:</strong> Ensure every student receives the same structured materials and resources.</li>
-                <li className="flex items-start"><span className="text-cyan-400 text-xl mr-3">•</span> <strong>Resource Management:</strong> A single, secure hub for all teaching files.</li>
-              </ul>
-            </div>
-
-            <div className="p-10 bg-[#11172e] rounded-2xl shadow-xl border-l-4 border-indigo-500 hover:shadow-2xl transition duration-300">
-              <h3 className="text-3xl font-bold text-cyan-300 mb-4 flex items-center">
-                🚀 For Students: Ownership & Engagement
-              </h3>
-              <ul className="space-y-3 text-indigo-200 text-lg">
-                <li className="flex items-start"><span className="text-indigo-400 text-xl mr-3">•</span> <strong>Accessibility:</strong> 24/7 access to all necessary revision guides and practice materials.</li>
-                <li className="flex items-start"><span className="text-indigo-400 text-xl mr-3">•</span> <strong>Active Revision:</strong> Interactive quizzes and activities promote recall.</li>
-                <li className="flex items-start"><span className="text-indigo-400 text-xl mr-3">•</span> <strong>Confidence Building:</strong> Instant feedback helps students self-correct and build mastery.</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* WORKFLOW SECTION */}
-        <section id="how" className="mt-24 py-16 bg-[#0f1530] rounded-3xl shadow-xl border border-cyan-300/40">
-          <h2 className="text-4xl font-extrabold mb-12 text-center text-cyan-300">
-            The 3-Step Educational Workflow
-          </h2>
-          <div className="grid md:grid-cols-3 gap-10 px-10">
-            <div className="p-8 bg-[#11172e] rounded-2xl shadow-lg hover:shadow-xl transition transform hover:-translate-y-2 duration-300">
-              <h4 className="text-2xl font-bold text-indigo-200 mb-3">1. Unify Accounts</h4>
-              <p className="text-indigo-200 leading-relaxed">Teachers and students securely create accounts based on their roles.</p>
-            </div>
-            <div className="p-8 bg-[#11172e] rounded-2xl shadow-lg hover:shadow-xl transition transform hover:-translate-y-2 duration-300">
-              <h4 className="text-2xl font-bold text-indigo-200 mb-3">2. Structure Content</h4>
-              <p className="text-indigo-200 leading-relaxed">Teachers create topic-based structured practice tests with explanations.</p>
-            </div>
-            <div className="p-8 bg-[#11172e] rounded-2xl shadow-lg hover:shadow-xl transition transform hover:-translate-y-2 duration-300">
-              <h4 className="text-2xl font-bold text-indigo-200 mb-3">3. Activate Learning</h4>
-              <p className="text-indigo-200 leading-relaxed">Students access personalized dashboards, quizzes, and active revision tools.</p>
-            </div>
-          </div>
-        </section>
-
-        {/* FINAL CTA – FREE OFFER */}
-        <section className="mt-24 text-center p-16 bg-gradient-to-r from-indigo-600 to-cyan-500 rounded-3xl shadow-2xl">
-          <h2 className="text-4xl font-extrabold text-white mb-4 drop-shadow-xl">
-            Ready to Transform Your Outcomes?
-          </h2>
-          <p className="text-indigo-100 text-xl mb-6">
-            For a limited time, EDUSTARHUB is completely FREE while we finalize our early-access program.
-          </p>
-
-          <div className="mt-6 p-6 bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg border border-white/10 max-w-md mx-auto text-center">
-            <h3 className="text-2xl font-bold text-white mb-2">Early Access Offer</h3>
-            <p className="text-4xl font-extrabold text-green-300 mb-3">FREE</p>
-            <p className="text-white/80 text-lg mb-4">Full Access • Limited Time • No Payment Required</p>
-
-            <button 
-              onClick={() => { window.location.href = '/auth'; }} 
-              className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl shadow-md transition-all w-full"
-            >
-              Start Free Access
+            {/* Menu Button */}
+            <button className={`px-4 py-2 rounded-full flex items-center space-x-2 ${PRIMARY_BG_ACCENT} text-white font-semibold hover:bg-red-700 shadow-md`} onClick={() => setIsMenuOpen(true)}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <span>Menu</span>
             </button>
           </div>
+
+          {/* Hero Content */}
+          <div className="relative z-10 flex flex-col items-center justify-center h-full text-white text-center px-6">
+            <h1 className="text-7xl sm:text-8xl lg:text-9xl font-extrabold mb-6 leading-none max-w-5xl [text-shadow:0_0_15px_rgba(0,0,0,0.8)]">
+              FOCUS ON MASTERY,<br />NOT MANAGEMENT.
+            </h1>
+            <p className="text-lg max-w-4xl mb-12 font-medium">
+              "We handle the planning and organization so you can concentrate entirely on achieving academic success."
+            </p>
+            <Link href="/auth">
+              <button className={`px-14 py-4 ${PRIMARY_BG_ACCENT} text-white rounded-xl text-2xl font-bold hover:bg-red-700 transition shadow-2xl`}>
+                Sign In
+              </button>
+            </Link>
+          </div>
         </section>
 
-      </main>
+        {/* --- Methodology Section --- */}
+        <section id="methodology" className="py-24 px-6 max-w-6xl mx-auto text-center">
+          <h2 className={`text-5xl font-extrabold mb-16 ${PRIMARY_ACCENT}`}>{methodologyContent.title}</h2>
+          <div className="grid md:grid-cols-3 gap-10">
+            {methodologyContent.points.map((point, index) => (
+              <div key={index} className={`p-8 ${CARD_BG} rounded-2xl shadow-lg border ${BORDER_COLOR} transition-shadow duration-300 hover:shadow-xl`}>
+                <p className="text-6xl mb-4">{point.icon}</p>
+                <h3 className={`text-2xl font-bold mb-3 ${TEXT_COLOR}`}>{point.title}</h3>
+                <p className={`${SECONDARY_TEXT_COLOR}`}>{point.description}</p>
+              </div>
+            ))}
+          </div>
+          <Link href="/methodology">
+            <button className={`mt-12 px-8 py-3 bg-white ${PRIMARY_ACCENT} font-semibold rounded-xl shadow-md transition border border-red-500 hover:bg-gray-100`}>
+              Explore Our Methodology in Depth
+            </button>
+          </Link>
+        </section>
 
-      <footer className="max-w-7xl mx-auto px-6 py-10 text-center text-indigo-300 text-sm">
-        &copy; {new Date().getFullYear()} EDUSTARHUB. Dedicated to educational excellence.
-      </footer>
+        {/* --- Features Section --- */}
+        <section id="features" className="py-24 px-6 max-w-6xl mx-auto">
+          <h2 className="text-5xl font-extrabold text-center mb-20">Powerful Features Designed for Success</h2>
+          <div className="space-y-20">
+            {/* Feature 1 */}
+            <div className={`grid md:grid-cols-2 gap-16 items-center p-8 ${CARD_BG} rounded-2xl shadow-lg border ${BORDER_COLOR} transition-all duration-700 ${animateFeature[0] ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"}`}>
+              <div><h3 className={`text-4xl font-bold mb-4 ${PRIMARY_ACCENT}`}>📊 Easy-to-use Dashboard</h3><p className={`${SECONDARY_TEXT_COLOR} text-lg leading-relaxed`}>Everything you need in one clean dashboard. Manage revision, quizzes, scores, and resources effortlessly.</p></div>
+              <img src="/dashboard.jpg" alt="Dashboard" className={`rounded-2xl shadow-xl border ${BORDER_COLOR} hover:scale-105 transition duration-300`} />
+            </div>
+
+            {/* Feature 2 */}
+            <div className={`grid md:grid-cols-2 gap-16 items-center p-8 ${CARD_BG} rounded-2xl shadow-lg border ${BORDER_COLOR} transition-all duration-700 ${animateFeature[1] ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"}`}>
+              <div className="md:order-2"><h3 className={`text-4xl font-bold mb-4 ${PRIMARY_ACCENT}`}>🧠 Revision Tools Hub</h3><p className={`${SECONDARY_TEXT_COLOR} text-lg leading-relaxed`}>Fun and interactive revision tools designed to help students master content faster.</p></div>
+              <img src="/revisontools.jpg" alt="Revision Tools" className={`rounded-2xl shadow-xl border ${BORDER_COLOR} hover:scale-105 transition duration-300 md:order-1`} />
+            </div>
+
+            {/* Feature 3 */}
+            <div className={`grid md:grid-cols-2 gap-16 items-center p-8 ${CARD_BG} rounded-2xl shadow-lg border ${BORDER_COLOR} transition-all duration-700 ${animateFeature[2] ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"}`}>
+              <div><h3 className={`text-4xl font-bold mb-4 ${PRIMARY_ACCENT}`}>📂 All Resources Created by Real Teachers</h3><p className={`${SECONDARY_TEXT_COLOR} text-lg leading-relaxed`}>Every resource is crafted by experienced educators, ensuring high-quality, reliable, and exam-focused content.</p></div>
+              <img src="/teacher.jpg" alt="Teacher Resources" className={`rounded-2xl shadow-xl border ${BORDER_COLOR} hover:scale-105 transition duration-300`} />
+            </div>
+          </div>
+        </section>
+
+        {/* --- Success / Testimonials Section --- */}
+        <section id="success" className="py-24 px-6 max-w-6xl mx-auto">
+          <h2 className={`text-5xl font-extrabold text-center mb-16 ${PRIMARY_ACCENT}`}>Student Success Stories</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {testimonials.map((review, index) => (
+              <div key={index} className={`p-6 ${PRIMARY_BG_ACCENT} rounded-2xl shadow-xl text-white flex flex-col justify-between h-full hover:shadow-2xl transition`}>
+                <p className="mb-6">"{review.quote}"</p>
+                <h3 className="font-bold text-lg">{review.name}</h3>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* --- FAQ Section --- */}
+        <section id="faq" className="py-24 px-6 max-w-4xl mx-auto text-left">
+          <h2 className={`text-5xl font-extrabold text-center mb-16 ${PRIMARY_ACCENT}`}>Frequently Asked Questions</h2>
+          <div className="space-y-8">
+            {faqItems.map((faq, idx) => (
+              <div key={idx} className="border-b border-gray-300 pb-6">
+                <h3 className="text-2xl font-semibold mb-2">{faq.question}</h3>
+                <p className={`${SECONDARY_TEXT_COLOR}`}>{faq.answer}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        
+
+      </main>
     </div>
   );
 }
