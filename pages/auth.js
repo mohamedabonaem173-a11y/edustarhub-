@@ -1,13 +1,15 @@
 // pages/signin.js
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
-// Helper component for cleaner JSX
+// Helper input component
 const FormInput = ({ label, value, onChange, type, required }) => (
   <div>
-    <label className="block text-sm font-semibold text-gray-200 mb-1">{label}</label>
+    <label className="block text-sm font-semibold text-gray-200 mb-1">
+      {label}
+    </label>
     <input
       value={value}
       onChange={onChange}
@@ -30,7 +32,6 @@ export default function AuthPage() {
   const [signUpRole, setSignUpRole] = useState('student');
   const [message, setMessage] = useState('');
 
-  // --- Handle authentication ---
   async function handleAuth(e) {
     e.preventDefault();
     setLoading(true);
@@ -38,17 +39,48 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
-        // --- SIGN UP ---
+        // --- SIGN UP via Supabase ---
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: fullName, role: signUpRole } } // stored in user_metadata
+          options: {
+            data: { full_name: fullName, role: signUpRole },
+          },
         });
 
         if (error) throw error;
 
-        // Show confirmation message
-        setMessage('✅ Success! Check your email for the confirmation link. Once confirmed, you can log in.');
+        const userId = data.user.id;
+
+        // --- INSERT PROFILE WITH EMAIL + FULL NAME ---
+        const { data: existing } = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', userId);
+
+        if (!existing || existing.length === 0) {
+          await supabase.from('profiles').insert([{
+            id: userId,
+            email: data.user.email,
+            full_name: fullName || data.user.user_metadata?.full_name || '',
+            role: signUpRole,
+            created_at: new Date(),
+            is_verified: false, // optional flag for verification
+          }]);
+        }
+
+        // --- SEND CONFIRMATION EMAIL VIA SERVER ROUTE ---
+        try {
+          await fetch('/api/send-confirmation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, fullName, userId }),
+          });
+          setMessage('✅ Success! Check your email for confirmation.');
+        } catch (brevoError) {
+          console.error('Brevo Error:', brevoError);
+          setMessage('❌ Signup successful but failed to send confirmation email.');
+        }
       } else {
         // --- SIGN IN ---
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
@@ -56,23 +88,31 @@ export default function AuthPage() {
 
         const userId = signInData.user.id;
 
-        // Insert profile only if it doesn't exist
+        // --- ENSURE PROFILE EXISTS ---
         const { data: existing } = await supabase.from('profiles').select().eq('id', userId);
-        if (existing.length === 0) {
+        if (!existing || existing.length === 0) {
           await supabase.from('profiles').insert([{
             id: userId,
+            email: signInData.user.email,
             full_name: signInData.user.user_metadata?.full_name || '',
-            role: signInData.user.user_metadata?.role || 'student'
+            role: signInData.user.user_metadata?.role || 'student',
+            created_at: new Date(),
+            is_verified: true,
           }]);
         }
 
-        // Redirect to dashboard
-        setMessage('🚀 Signed in successfully! Redirecting...');
-        await router.push(`/${signInRole}/dashboard`);
+        // --- OPTIONAL: check verification before redirect ---
+        const profile = existing[0];
+        if (profile && profile.is_verified === false) {
+          setMessage('⚠️ Please verify your email before accessing dashboard.');
+        } else {
+          setMessage('🚀 Signed in successfully! Redirecting...');
+          await router.push(`/${signInRole}/dashboard`);
+        }
       }
-    } catch (error) {
-      console.error("Auth Error:", error.message);
-      setMessage("❌ Auth Error: " + (error.message || "An unknown error occurred."));
+    } catch (err) {
+      console.error('Auth Error:', err);
+      setMessage(`❌ ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -81,21 +121,21 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900">
       <div className="w-full max-w-md bg-gray-800/90 backdrop-blur-lg border border-cyan-500/50 rounded-3xl shadow-[0_0_60px_cyan] p-8 relative overflow-hidden">
-        <div className="absolute inset-0 border-2 border-cyan-400 rounded-3xl animate-pulse mix-blend-overlay pointer-events-none"></div>
+        <div className="absolute inset-0 border-2 border-cyan-400 rounded-3xl animate-pulse pointer-events-none"></div>
 
         {/* Toggle */}
         <div className="flex mb-8 border-b border-gray-600">
           <button onClick={() => setIsSignUp(false)}
-            className={`flex-1 py-3 text-xl font-bold transition ${!isSignUp ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-white'}`}>
+            className={`flex-1 py-3 text-xl font-bold ${!isSignUp ? 'text-cyan-400 border-b-2' : 'text-gray-400'}`}>
             Sign In
           </button>
           <button onClick={() => setIsSignUp(true)}
-            className={`flex-1 py-3 text-xl font-bold transition ${isSignUp ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-white'}`}>
+            className={`flex-1 py-3 text-xl font-bold ${isSignUp ? 'text-cyan-400 border-b-2' : 'text-gray-400'}`}>
             Sign Up
           </button>
         </div>
 
-        <h1 className="text-3xl md:text-4xl font-extrabold text-center text-cyan-300 mb-6 drop-shadow-lg">
+        <h1 className="text-3xl font-extrabold text-center text-cyan-300 mb-6">
           {isSignUp ? 'Create Account' : 'Sign In to EDUSTARHUB'}
         </h1>
 
@@ -103,11 +143,11 @@ export default function AuthPage() {
           {!isSignUp && (
             <div className="flex bg-gray-900 rounded-xl p-1 gap-2">
               <button type="button" onClick={() => setSignInRole('student')}
-                className={`flex-1 py-3 rounded-xl font-bold transition ${signInRole === 'student' ? 'bg-cyan-600 text-black shadow-[0_0_20px_cyan]' : 'text-gray-400 hover:bg-gray-700'}`}>
+                className={`flex-1 py-3 rounded-xl font-bold ${signInRole === 'student' ? 'bg-cyan-600 text-black' : 'text-gray-400'}`}>
                 Student
               </button>
               <button type="button" onClick={() => setSignInRole('teacher')}
-                className={`flex-1 py-3 rounded-xl font-bold transition ${signInRole === 'teacher' ? 'bg-cyan-600 text-black shadow-[0_0_20px_cyan]' : 'text-gray-400 hover:bg-gray-700'}`}>
+                className={`flex-1 py-3 rounded-xl font-bold ${signInRole === 'teacher' ? 'bg-cyan-600 text-black' : 'text-gray-400'}`}>
                 Teacher
               </button>
             </div>
@@ -115,32 +155,33 @@ export default function AuthPage() {
 
           {isSignUp && (
             <>
-              <FormInput label="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} type="text" required />
-              <div>
-                <label className="block text-sm font-semibold text-gray-200 mb-1">Account Type</label>
-                <select value={signUpRole} onChange={(e) => setSignUpRole(e.target.value)}
-                  className="w-full border border-gray-700 bg-gray-900 text-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 transition">
-                  <option value="student">Student</option>
-                  <option value="teacher">Teacher</option>
-                </select>
-              </div>
+              <FormInput label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} type="text" required />
+              <select
+                value={signUpRole}
+                onChange={e => setSignUpRole(e.target.value)}
+                className="w-full bg-gray-900 text-gray-200 rounded-xl p-3"
+              >
+                <option value="student">Student</option>
+                <option value="teacher">Teacher</option>
+              </select>
             </>
           )}
 
-          <FormInput label="Email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
-          <FormInput label="Password" value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
+          <FormInput label="Email" value={email} onChange={e => setEmail(e.target.value)} type="email" required />
+          <FormInput label="Password" value={password} onChange={e => setPassword(e.target.value)} type="password" required />
 
-          <button type="submit" disabled={loading}
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-400 to-indigo-500 text-black font-bold text-lg shadow-[0_0_30px_cyan] hover:shadow-[0_0_50px_cyan] transition-all transform hover:-translate-y-1 disabled:opacity-50">
+          <button disabled={loading} className="w-full py-4 rounded-xl bg-cyan-500 font-bold text-black">
             {loading ? (isSignUp ? 'Creating...' : 'Signing In...') : (isSignUp ? 'Sign Up' : `Sign In as ${signInRole}`)}
           </button>
 
-          {message && <div className={`text-center mt-2 font-semibold ${message.startsWith('❌') ? 'text-red-500' : 'text-green-400'} animate-pulse`}>
-            {message}
-          </div>}
+          {message && (
+            <div className={`text-center font-semibold ${message.startsWith('❌') ? 'text-red-500' : 'text-green-400'}`}>
+              {message}
+            </div>
+          )}
         </form>
 
-        <div className="mt-6 text-center text-gray-400 text-sm">
+        <div className="mt-6 text-center text-gray-400">
           {!isSignUp ? (
             <span>
               Don't have an account?{' '}
@@ -150,7 +191,6 @@ export default function AuthPage() {
             <Link href="/" className="hover:text-cyan-400 transition">← Back to Home</Link>
           )}
         </div>
-
       </div>
     </div>
   );

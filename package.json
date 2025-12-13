@@ -11,13 +11,16 @@
     "@google/genai": "^1.31.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.26.0",
+    "dotenv": "^17.2.3",
     "firebase": "^12.6.0",
     "framer-motion": "^12.23.25",
     "next": "14.0.0",
+    "nodemailer": "^7.0.11",
     "openai": "^6.10.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "react-webcam": "^7.2.0"
+    "react-webcam": "^7.2.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.14",
