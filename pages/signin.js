@@ -1,11 +1,9 @@
-// pages/signin.js
 import { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient'; // Ensure this points to your configured client
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { v4 as uuidv4 } from 'uuid';
 
-// Helper Input Component
+// Helper Input Component (remains the same)
 const FormInput = ({ label, value, onChange, type, required }) => (
   <div>
     <label className="block text-sm font-semibold text-gray-200 mb-1">{label}</label>
@@ -31,7 +29,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  // Handle authentication
+  // --- CORRECTED AUTH HANDLER ---
   async function handleAuth(e) {
     e.preventDefault();
     setLoading(true);
@@ -39,57 +37,59 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
-        // Generate verification token
-        const verificationToken = uuidv4();
+        // --- SIGN UP LOGIC ---
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
 
-        // Supabase signup
-        const { data, error } = await supabase.auth.signUp({
+        // 1. Supabase signup with mandatory redirect URL (Crucial for callback to work)
+        const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: fullName, role: signUpRole } },
+          options: {
+            emailRedirectTo: `${baseUrl}/auth/callback`,
+            data: { full_name: fullName },
+          },
         });
-        if (error) throw error;
+        
+        if (authError) throw authError;
 
-        // Insert profile
-        await supabase.from('profiles').insert([{
-          id: data.user.id,
-          email,
-          full_name: fullName,
-          role: signUpRole,
-          is_verified: false,
-          verification_token: verificationToken,
-        }]);
-
-        // Send verification email via API
-        const sendRes = await fetch('/api/send-verification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, fullName, verificationToken }),
-        });
-
-        if (!sendRes.ok) throw new Error('Failed to send verification email');
-
-        setMessage('✅ Signup successful! Check your email for the verification link.');
-
+        // 2. Update Profile with Role and Full Name
+        // This is necessary because the trigger only creates the row, it doesn't assign the role.
+        const userId = authData.user?.id || authData.user?.user?.id;
+        
+        if (userId) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ 
+              role: signUpRole,
+              full_name: fullName
+            })
+            // Filter by the 'id' column, which is the user UUID
+            .eq('id', userId); 
+            
+          if (profileError) {
+            console.error('Profile role update failed:', profileError);
+          }
+        }
+        
+        setMessage('✅ Signup successful! Check your email to verify your account.');
+        
       } else {
-        // Sign in
+        // --- SIGN IN LOGIC ---
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
 
-        const userId = signInData.user.id;
+        // Fetch the current user's actual role from the database for accurate redirect
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', signInData.user.id)
+          .single();
 
-        // Insert profile if missing
-        const { data: existing } = await supabase.from('profiles').select().eq('id', userId);
-        if (existing.length === 0) {
-          await supabase.from('profiles').insert([{
-            id: userId,
-            full_name: signInData.user.user_metadata?.full_name || '',
-            role: signInData.user.user_metadata?.role || 'student',
-          }]);
-        }
+        // Use the actual role from the database, falling back to the UI selection
+        const actualRole = profile?.role || signInRole; 
 
         setMessage('🚀 Signed in successfully! Redirecting...');
-        await router.push(`/${signInRole}/dashboard`);
+        await router.push(`/${actualRole}/dashboard`);
       }
     } catch (err) {
       console.error('Auth Error:', err);
@@ -99,6 +99,7 @@ export default function AuthPage() {
     }
   }
 
+  // --- Component Rendering (JSX) ---
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900">
       <div className="w-full max-w-md bg-gray-800/90 backdrop-blur-lg border border-cyan-500/50 rounded-3xl shadow-[0_0_60px_cyan] p-8 relative overflow-hidden">
@@ -125,6 +126,7 @@ export default function AuthPage() {
         </h1>
 
         <form onSubmit={handleAuth} className="space-y-6">
+          {/* Sign In Role Selection */}
           {!isSignUp && (
             <div className="flex bg-gray-900 rounded-xl p-1 gap-2">
               <button type="button" onClick={() => setSignInRole('student')}
@@ -138,6 +140,7 @@ export default function AuthPage() {
             </div>
           )}
 
+          {/* Sign Up Fields */}
           {isSignUp && (
             <>
               <FormInput label="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} type="text" required />
