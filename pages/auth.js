@@ -36,19 +36,16 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
-        // Manual signup (no password stored)
         const { error: insertError } = await supabase
           .from("manual_signups")
           .insert([{ email, full_name: fullName, role: signUpRole }]);
         if (insertError) throw insertError;
         setSubmittedForReview(true);
       } else {
-        // Sign in
         const { data: signInData, error: signInError } =
           await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
 
-        // Fetch profile
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("role, status")
@@ -56,19 +53,15 @@ export default function AuthPage() {
           .single();
 
         if (profileError || !profile) {
-          setMessage(
-            "❌ Profile not found. Please contact support."
-          );
+          setMessage("❌ Profile not found. Please contact support.");
           return;
         }
 
-        // Pending users
         if (profile.status !== "approved") {
           await router.push("/pending");
           return;
         }
 
-        // Role-based redirect
         if (!profile.role) {
           await router.push("/pending");
           return;
@@ -87,6 +80,12 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900">
       <div className="w-full max-w-md bg-gray-800/90 backdrop-blur-lg border border-cyan-500/50 rounded-3xl shadow-[0_0_60px_cyan] p-8 relative overflow-hidden">
+
+        {/* Platform Name */}
+        <h1 className="text-4xl font-extrabold text-cyan-300 text-center mb-6 drop-shadow-lg">
+          EDUSTARHUB
+        </h1>
+
         {submittedForReview ? (
           <div className="text-center py-10 px-4">
             <h1 className="text-3xl font-extrabold text-cyan-300 mb-4">

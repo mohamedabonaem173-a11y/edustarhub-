@@ -4,7 +4,7 @@ import { supabase } from "../../lib/supabaseClient";
 import Navbar from "../../components/Navbar";
 import Sidebar from "../../components/Sidebar";
 
-// Fun quotes for dashboard
+// Fun quotes
 const funnyQuotes = [
   "Your brain is a supercomputer. Don't forget to plug in. 🤯",
   "Keep calm and pretend you understand everything. 😎",
@@ -49,50 +49,76 @@ export default function StudentDashboard() {
     motivation: "Checking credentials..."
   });
 
-  // --- Load user data and enforce role/status
   useEffect(() => {
     setQuote(funnyQuotes[randomNumber(funnyQuotes.length)]);
 
     async function loadUserData() {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      try {
+        setLoading(true);
 
-      if (!user) return router.push("/auth");
+        // 1️⃣ Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          console.error("Auth error:", userError);
+          router.push("/auth");
+          return;
+        }
 
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+        // 2️⃣ Get profile
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
 
-      if (!profile || error) return router.push("/auth");
+        if (profileError || !profile) {
+          console.error("Profile fetch error:", profileError);
+          router.push("/auth");
+          return;
+        }
 
-      // Pending login logic
-      if (profile.status !== "approved") return router.push("/pending");
+        // 3️⃣ Pending login
+        if (profile.status !== "approved") {
+          router.push("/pending");
+          return;
+        }
 
-      // Role check
-      if (profile.role !== EXPECTED_ROLE) return router.push(`/${profile.role}/dashboard`);
+        // 4️⃣ Role check
+        if (profile.role !== EXPECTED_ROLE) {
+          router.push(`/${profile.role}/dashboard`);
+          return;
+        }
 
-      setUserProfile(profile);
-      setStats({
-        gamePoints: profile.game_points || 0,
-        resourcesDownloaded: profile.resources_downloaded || 0,
-        buddyName: profile.buddy_name || "New Buddy",
-        motivation: `Welcome back, ${profile.full_name.split(' ')[0]}!`
-      });
-      setLoading(false);
+        // 5️⃣ Safe profile and stats
+        const firstName = profile.full_name?.split(" ")[0] || "Student";
+        setUserProfile(profile);
+        setStats({
+          gamePoints: profile.game_points || 0,
+          resourcesDownloaded: profile.resources_downloaded || 0,
+          buddyName: profile.buddy_name || "New Buddy",
+          motivation: `Welcome back, ${firstName}!`
+        });
+
+      } catch (err) {
+        console.error("Dashboard load error:", err);
+        router.push("/auth"); // fallback
+      } finally {
+        setLoading(false);
+      }
     }
 
     loadUserData();
   }, [router]);
 
-  if (loading || !userProfile) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f0c29] to-[#24243e] text-cyan-400 text-3xl font-bold">
         Loading Student Dashboard...
       </div>
     );
   }
+
+  const firstName = userProfile.full_name?.split(" ")[0] || "Student";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] font-sans relative overflow-hidden">
@@ -106,7 +132,7 @@ export default function StudentDashboard() {
             <div className="relative bg-black/20 backdrop-blur-md rounded-3xl shadow-[0_0_40px_cyan] p-8 text-white flex flex-col md:flex-row items-center overflow-hidden border-2 border-cyan-500">
               <div className="space-y-3">
                 <h1 className="text-4xl md:text-5xl font-extrabold text-cyan-400">
-                  Welcome Back, {userProfile.full_name.split(" ")[0]}!
+                  Welcome Back, {firstName}!
                 </h1>
                 <p className="text-lg md:text-xl italic text-blue-300">"{quote}"</p>
               </div>
