@@ -1,9 +1,9 @@
 // pages/auth/callback.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js"; 
 
-// --- Supabase Initialization (Must use your ENV variables) ---
+// --- Supabase Initialization ---
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -11,54 +11,57 @@ const supabase = createClient(
 
 export default function AuthCallback() {
   const router = useRouter();
-  const [status, setStatus] = useState('Verifying account and credentials...');
+  const [status, setStatus] = useState('Verifying email token...');
 
   useEffect(() => {
-    // 1. Listen for the authentication state change
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        // This 'SIGNED_IN' event fires after the email token is processed
-        if (event === 'SIGNED_IN' && session) {
-          handleRoleRedirect(session.user.id);
-        } else if (event === 'SIGNED_OUT') {
-          // Fallback if the session is somehow invalidated
-          setStatus('Verification failed. Redirecting to sign in...');
-          router.push('/signin?error=verification_failed');
-        } else if (event === 'INITIAL_SESSION') {
-            // Handle cases where the session is already present but no sign-in event fires
-            if (session) {
-                handleRoleRedirect(session.user.id);
-            }
-        }
-      }
-    );
+    // 1. Function to process the token and session
+    async function handleSessionCheck() {
+      setStatus('Waiting for session establishment...');
 
+      // The key is to wait for the Supabase client to process the URL fragment 
+      // which contains the access_token and refresh_token.
+      
+      // Use getSession() to check if the client has successfully parsed the tokens.
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session) {
+        // Session found! Proceed to role check and redirect.
+        handleRoleRedirect(session.user.id);
+      } else {
+        // If no session is found after a few moments, the link failed or expired.
+        // The most likely cause is the error you already saw: otp_expired.
+        setStatus('Session not established. Link may be invalid or expired. Redirecting...');
+        // We redirect to signin to allow the user to try again or sign in normally.
+        router.push('/signin?error=link_failed'); 
+      }
+    }
+    
     // 2. Function to fetch the role and redirect
     const handleRoleRedirect = async (userId) => {
-        setStatus('Fetching your user profile...');
+        setStatus('Fetching user profile and role...');
         
         // Fetch the user's profile information to get the role
         const { data, error } = await supabase
             .from('profiles') 
             .select('role')   
-            .eq('id', userId) // Use 'id' as per your schema
+            .eq('id', userId) 
             .single();
 
         if (error || !data || !data.role) {
             console.error('Error fetching user role, profile missing:', error?.message);
-            // Send them to an onboarding or error page if profile/role is missing
-            router.push('/signin?error=profile_incomplete');
+            setStatus('Profile incomplete. Please contact support.');
+            router.push('/signin?error=profile_incomplete'); 
             return;
         }
 
-        setStatus(`Redirecting to ${data.role} dashboard...`);
-
-        // 3. Conditional Redirect based on the role
+        setStatus(`Success! Redirecting to ${data.role} dashboard...`);
         router.push(`/${data.role}/dashboard`);
     };
 
-    // 4. Cleanup
-    return () => subscription.unsubscribe();
+    // Execute the session check logic
+    handleSessionCheck();
+    
+    // No cleanup necessary as we are not using a continuous subscription
   }, [router]);
 
   return (
